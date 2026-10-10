@@ -150,3 +150,26 @@ textarea { width: 100%; resize: vertical; font-size: .85rem; }
   .seg button { padding: 7px 9px; font-size: .8rem; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* Entdecken / Swipe */
+.discover { display: grid; gap: 14px; padding-block: 16px; justify-items: center; }
+.disc-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; }
+.disc-head .hint { margin: 0; }
+.deck { position: relative; width: min(380px, 100%); aspect-ratio: 2/3.6; max-width: 100%; }
+.swipe { position: absolute; inset: 0; background: var(--panel); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; touch-action: pan-y; user-select: none; cursor: grab; transition: transform .25s ease, opacity .25s; }
+.swipe.dragging { transition: none; cursor: grabbing; }
+.swipe.back { transform: scale(.95) translateY(10px); opacity: .6; pointer-events: none; }
+.swipe .poster { flex: 0 0 auto; aspect-ratio: auto; height: 62%; }
+.swipe .poster img { pointer-events: none; }
+.swipe .body { overflow-y: auto; }
+.swipe .ov { font-size: .85rem; color: var(--muted); margin: 0; }
+.stamp { position: absolute; top: 18px; padding: 6px 12px; border: 3px solid; border-radius: 8px; font: 900 1.6rem/1 var(--f-display); text-transform: uppercase; opacity: 0; transform: rotate(-12deg); pointer-events: none; }
+.stamp.yes { left: 16px; color: var(--accent); }
+.stamp.no { right: 16px; color: var(--hot); transform: rotate(12deg); }
+.disc-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.act { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 10px 16px; cursor: pointer; font-weight: 600; }
+.act:hover { border-color: var(--fg); }
+.act.nie { color: var(--hot); border-color: var(--hot); }
+.act.go { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.act:disabled { opacity: .4; cursor: default; }
+.hint.center { text-align: center; }
