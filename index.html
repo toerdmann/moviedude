@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MovieDude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo">MovieDude</span>
+    <span class="tagline">Was läuft heute?</span>
+  </div>
+  <div class="top-actions">
+    <div class="sync" id="sync" hidden>
+      <span id="syncText">Abgleich…</span>
+      <span class="bar"><span id="syncBar"></span></span>
+    </div>
+    <button class="btn ghost" id="openSettings" type="button" aria-label="Einstellungen">Einstellungen</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs" aria-label="Listen"></nav>
+
+<section class="filters" aria-label="Filter">
+  <div class="row">
+    <input id="q" type="search" placeholder="Titel suchen…" autocomplete="off">
+    <div class="seg" id="source" role="group" aria-label="Quelle">
+      <button type="button" data-v="avail" class="on">Heute verfügbar</button>
+      <button type="button" data-v="shelf">Regal</button>
+      <button type="button" data-v="stream">Stream</button>
+      <button type="button" data-v="all">Alle</button>
+    </div>
+    <select id="runtime" aria-label="Laufzeit">
+      <option value="0">Jede Länge</option>
+      <option value="100">bis 100 min</option>
+      <option value="120">bis 120 min</option>
+      <option value="150">bis 150 min</option>
+    </select>
+    <select id="sort" aria-label="Sortierung">
+      <option value="rating">Beste Bewertung</option>
+      <option value="title">Titel A–Z</option>
+      <option value="new">Neueste zuerst</option>
+      <option value="short">Kürzeste zuerst</option>
+    </select>
+    <button class="btn dice" id="dice" type="button" title="Zufälligen Film aus der aktuellen Auswahl ziehen">W20 würfeln</button>
+  </div>
+  <div class="genres" id="genres"></div>
+</section>
+
+<main>
+  <p class="count" id="count"></p>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden></div>
+  <div class="tmdb-search" id="tmdbSearch" hidden>
+    <button class="btn" id="tmdbSearchBtn" type="button">Bei TMDB suchen</button>
+  </div>
+</main>
+
+<div class="tray" id="tray" hidden>
+  <button class="tray-btn" id="trayOpen" type="button"><span>Heute Abend</span> <b id="trayCount">0</b></button>
+</div>
+
+<dialog id="trayDlg" class="dlg">
+  <div class="dlg-head"><h2>Heute Abend</h2><button class="btn ghost" data-close type="button">Schließen</button></div>
+  <ol id="trayList" class="tray-list"></ol>
+  <label class="lbl" for="trayText">Nachricht zum Verschicken</label>
+  <textarea id="trayText" rows="8" readonly></textarea>
+  <div class="dlg-actions">
+    <button class="btn" id="trayCopy" type="button">Text kopieren</button>
+    <button class="btn ghost" id="trayClear" type="button">Auswahl leeren</button>
+  </div>
+</dialog>
+
+<dialog id="settingsDlg" class="dlg">
+  <div class="dlg-head"><h2>Einstellungen</h2><button class="btn ghost" data-close type="button">Schließen</button></div>
+  <label class="lbl" for="apiKey">TMDB API-Schlüssel (der kurze)</label>
+  <div class="inline">
+    <input id="apiKey" type="text" autocomplete="off" spellcheck="false" placeholder="z. B. e62d0bc…">
+    <button class="btn" id="saveKey" type="button">Speichern</button>
+  </div>
+  <p class="hint" id="keyStatus"></p>
+  <h3>Meine Streamingdienste</h3>
+  <p class="hint">Was du gerade abonniert hast. Umschalten wirkt sofort.</p>
+  <div class="services" id="services"></div>
+  <h3>Daten</h3>
+  <div class="dlg-actions">
+    <button class="btn ghost" id="refreshProv" type="button">Verfügbarkeit neu laden</button>
+    <button class="btn ghost" id="rematch" type="button">Alles neu abgleichen</button>
+  </div>
+  <p class="hint" id="stats"></p>
+  <p class="attr">Film- und Streamingdaten: <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>, Verfügbarkeit von <a href="https://www.justwatch.com" target="_blank" rel="noopener">JustWatch</a>. Diese App nutzt die TMDB-API, ist aber nicht von TMDB zertifiziert.</p>
+</dialog>
+
+<dialog id="newListDlg" class="dlg small">
+  <div class="dlg-head"><h2>Neue Liste</h2><button class="btn ghost" data-close type="button">Abbrechen</button></div>
+  <form id="newListForm">
+    <label class="lbl" for="newListName">Name</label>
+    <div class="inline">
+      <input id="newListName" type="text" maxlength="30" placeholder="z. B. Halloween" required>
+      <button class="btn" type="submit">Anlegen</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
