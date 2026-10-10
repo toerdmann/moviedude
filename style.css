@@ -173,3 +173,4 @@ textarea { width: 100%; resize: vertical; font-size: .85rem; }
 .act.go { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .act:disabled { opacity: .4; cursor: default; }
 .hint.center { text-align: center; }
+.sticker.sarah { background: var(--panel); color: var(--fg); border: 1px solid var(--line); }
