@@ -280,6 +280,7 @@ function card(id) {
     ),
     el('div', { class: 'body' },
       el('h3', { class: 'title' }, f.t),
+      f.o && norm(f.o) !== norm(f.t) ? el('div', { class: 'meta orig' }, f.o) : null,
       el('div', { class: 'meta' }, [f.y, f.r ? f.r + ' min' : null, f.v ? '★ ' + f.v.toFixed(1) : null].filter(Boolean).join(' · ')),
       el('div', { class: 'meta' }, f.g.slice(0, 3).join(', ')),
       el('div', { class: 'lists' }, state.lists.map(l => el('button', {
@@ -289,7 +290,8 @@ function card(id) {
         f.imdb ? el('a', { href: 'https://www.imdb.com/title/' + f.imdb + '/', target: '_blank', rel: 'noopener' }, 'IMDb') : null,
         f.tr ? el('a', { href: 'https://www.youtube.com/watch?v=' + f.tr, target: '_blank', rel: 'noopener' }, 'Trailer') : null,
         el('a', { href: lbLink(id), target: '_blank', rel: 'noopener' }, 'Letterboxd'),
-        !isSeen ? el('button', { type: 'button', onclick: () => markSeen(id) }, 'Gesehen') : null,
+        !isSeen ? el('button', { type: 'button', onclick: () => markSeen(id) }, 'Gesehen')
+          : state.seenLocal.includes(id) ? el('button', { type: 'button', onclick: () => unmarkSeen(id) }, 'Doch nicht gesehen') : null,
         state.hidden.includes(id)
           ? el('button', { type: 'button', onclick: () => unhide(id) }, 'Zurückholen')
           : el('button', { class: 'hide', type: 'button', onclick: () => hide(id) }, 'Nie')
@@ -327,6 +329,12 @@ function markSeen(id) {
   persist(); rebuild(); render();
   window.open(lbLink(id), '_blank', 'noopener');
   toast('Als gesehen markiert. Hak ihn auf Letterboxd ab, dann bleibt alles synchron.');
+}
+function unmarkSeen(id) {
+  state.seenLocal = state.seenLocal.filter(x => x !== id);
+  if (state.members[id] && !state.members[id].length) delete state.members[id];
+  persist(); rebuild(); render();
+  toast('Wieder in der Liste.');
 }
 function toggleTray(id) {
   state.tray = state.tray.includes(id) ? state.tray.filter(x => x !== id) : [...state.tray, id];
