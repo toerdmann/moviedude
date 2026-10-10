@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=202610102110">
+<link rel="stylesheet" href="style.css?v=202610102127">
 </head>
 <body>
 <header class="top">
@@ -112,6 +112,14 @@
     <button class="btn ghost" id="refreshProv" type="button">Verfügbarkeit neu laden</button>
     <button class="btn ghost" id="rematch" type="button">Alles neu abgleichen</button>
   </div>
+  <h3>Backup</h3>
+  <p class="hint">Deine Listen, Entscheidungen und Einstellungen liegen nur in diesem Browser. Sichere sie ab und zu als Datei.</p>
+  <div class="dlg-actions">
+    <button class="btn" id="exportBtn" type="button">Backup herunterladen</button>
+    <label class="btn ghost" for="importFile">Backup einspielen</label>
+    <input id="importFile" type="file" accept="application/json,.json" hidden>
+  </div>
+  <p class="hint" id="backupStatus"></p>
   <p class="hint" id="stats"></p>
   <p class="attr">Film- und Streamingdaten: <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>, Verfügbarkeit von <a href="https://www.justwatch.com" target="_blank" rel="noopener">JustWatch</a>. Diese App nutzt die TMDB-API, ist aber nicht von TMDB zertifiziert.</p>
 </dialog>
@@ -129,6 +137,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="app.js?v=202610102110"></script>
+<script src="app.js?v=202610102127"></script>
 </body>
 </html>

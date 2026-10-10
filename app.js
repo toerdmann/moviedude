@@ -552,6 +552,28 @@ function wire() {
       renderServices(); sync();
     } catch (e) { $('#keyStatus').textContent = 'TMDB nicht erreichbar: ' + e.message; }
   });
+  $('#exportBtn').addEventListener('click', () => {
+    const { apiKey, ...rest } = state;
+    const blob = new Blob([JSON.stringify({ app: 'moviedude', version: 1, exportedAt: new Date().toISOString(), state: rest }, null, 1)], { type: 'application/json' });
+    const a = el('a', { href: URL.createObjectURL(blob), download: 'moviedude-backup-' + new Date().toISOString().slice(0, 10) + '.json' });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    $('#backupStatus').textContent = 'Backup heruntergeladen. Der TMDB-Schlüssel ist bewusst nicht enthalten.';
+  });
+  $('#importFile').addEventListener('change', async e => {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (data.app !== 'moviedude' || !data.state) throw new Error('Das ist kein MovieDude-Backup.');
+      if (!window.confirm(`Backup vom ${(data.exportedAt || '').slice(0, 10)} einspielen? Deine aktuellen Listen und Entscheidungen in diesem Browser werden ersetzt.`)) return;
+      const key = state.apiKey;
+      for (const k of Object.keys(state)) delete state[k];
+      Object.assign(state, data.state, { apiKey: key });
+      persist(); rebuild(); render();
+      $('#backupStatus').textContent = 'Backup eingespielt.';
+      sync();
+    } catch (err) { $('#backupStatus').textContent = 'Einspielen fehlgeschlagen: ' + err.message; }
+  });
   $('#refreshProv').addEventListener('click', () => { for (const id of Object.keys(cache.films)) cache.films[id].ts = 0; $('#settingsDlg').close(); sync(); });
   $('#rematch').addEventListener('click', () => { $('#settingsDlg').close(); sync({ force: true }); });
   document.querySelectorAll('#source button').forEach(b => b.addEventListener('click', () => { state.source = b.dataset.v; persist(); render(); }));
