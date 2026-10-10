@@ -22,6 +22,7 @@ const state = Object.assign({
   members: {},                          // tmdbId -> [listId]  (fehlt = Standard)
   hidden: [],                           // "Nie" / ausgeblendet
   seenLocal: [],                        // in der App als gesehen markiert
+  unseenLocal: [],                      // MyMovies-"gesehen" in der App überstimmt
   extra: [],                            // per TMDB-Suche hinzugefügt
   tray: [],                             // Auswahl für heute Abend
   snooze: {},                           // tmdbId -> Zeitpunkt, ab dem er wieder im Feed auftaucht
@@ -128,19 +129,21 @@ const keyLb = s => 'l:' + s.lb;
 
 let lib = new Map();   // tmdbId -> { shelf: disc|null, wl: bool, lb: uri|null }
 let seen = new Set();
+let seenLb = new Set();
 
 function rebuild() {
-  lib = new Map(); seen = new Set();
+  lib = new Map(); seen = new Set(); seenLb = new Set();
+  const unseen = new Set(state.unseenLocal || []);
   const get = id => { if (!lib.has(id)) lib.set(id, { shelf: null, wl: false, lb: null, shelfSeen: false, mineShelf: false, sarah: false }); return lib.get(id); };
   for (const s of SRC.shelf) {
     const id = cache.match[keyShelf(s)]; if (!id) continue;
     const e = get(id);
     e.shelf = e.shelf && e.shelf !== s.disc ? 'DVD + Blu-ray' : s.disc;
     if (s.owner === 'sarah') e.sarah = true; else e.mineShelf = true;
-    if (s.seen) { e.shelfSeen = true; seen.add(id); }
+    if (s.seen && !unseen.has(id)) { e.shelfSeen = true; seen.add(id); }
   }
   for (const s of SRC.watchlist) { const id = cache.match[keyLb(s)]; if (!id) continue; const e = get(id); e.wl = true; e.lb = s.lb; e.added = s.added || null; }
-  for (const s of SRC.watched) { const id = cache.match[keyLb(s)]; if (id) seen.add(id); }
+  for (const s of SRC.watched) { const id = cache.match[keyLb(s)]; if (id) { seen.add(id); seenLb.add(id); } }
   for (const id of state.seenLocal) seen.add(id);
   for (const id of state.extra) get(id);
 }
@@ -301,7 +304,7 @@ function card(id) {
         f.tr ? el('a', { href: 'https://www.youtube.com/watch?v=' + f.tr, target: '_blank', rel: 'noopener' }, 'Trailer') : null,
         el('a', { href: lbLink(id), target: '_blank', rel: 'noopener' }, 'Letterboxd'),
         !isSeen ? el('button', { type: 'button', onclick: () => markSeen(id) }, 'Gesehen')
-          : state.seenLocal.includes(id) ? el('button', { type: 'button', onclick: () => unmarkSeen(id) }, 'Doch nicht gesehen') : null,
+          : !seenLb.has(id) ? el('button', { type: 'button', onclick: () => unmarkSeen(id) }, 'Doch nicht gesehen') : null,
         state.hidden.includes(id)
           ? el('button', { type: 'button', onclick: () => unhide(id) }, 'Zurückholen')
           : el('button', { class: 'hide', type: 'button', onclick: () => hide(id) }, 'Nie')
@@ -339,6 +342,7 @@ function hide(id) { state.hidden = [...new Set([...state.hidden, id])]; state.tr
 function unhide(id) { state.hidden = state.hidden.filter(x => x !== id); persist(); render(); }
 function markSeen(id) {
   state.seenLocal = [...new Set([...state.seenLocal, id])];
+  state.unseenLocal = (state.unseenLocal || []).filter(x => x !== id);
   if (!state.members[id]) state.members[id] = [];  // fällt aus der Standardliste
   persist(); rebuild(); render();
   window.open(lbLink(id), '_blank', 'noopener');
@@ -346,6 +350,7 @@ function markSeen(id) {
 }
 function unmarkSeen(id) {
   state.seenLocal = state.seenLocal.filter(x => x !== id);
+  if (lib.get(id)?.shelfSeen) state.unseenLocal = [...new Set([...(state.unseenLocal || []), id])];
   if (state.members[id] && !state.members[id].length) delete state.members[id];
   persist(); rebuild(); render();
   toast('Wieder in der Liste.');
