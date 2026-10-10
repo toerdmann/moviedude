@@ -131,11 +131,12 @@ let seen = new Set();
 
 function rebuild() {
   lib = new Map(); seen = new Set();
-  const get = id => { if (!lib.has(id)) lib.set(id, { shelf: null, wl: false, lb: null, shelfSeen: false }); return lib.get(id); };
+  const get = id => { if (!lib.has(id)) lib.set(id, { shelf: null, wl: false, lb: null, shelfSeen: false, mineShelf: false, sarah: false }); return lib.get(id); };
   for (const s of SRC.shelf) {
     const id = cache.match[keyShelf(s)]; if (!id) continue;
     const e = get(id);
     e.shelf = e.shelf && e.shelf !== s.disc ? 'DVD + Blu-ray' : s.disc;
+    if (s.owner === 'sarah') e.sarah = true; else e.mineShelf = true;
     if (s.seen) { e.shelfSeen = true; seen.add(id); }
   }
   for (const s of SRC.watchlist) { const id = cache.match[keyLb(s)]; if (!id) continue; const e = get(id); e.wl = true; e.lb = s.lb; e.added = s.added || null; }
@@ -145,7 +146,7 @@ function rebuild() {
 }
 
 /* Kandidat = auf Watchlist oder ungesehen im Regal */
-const isCandidate = id => { const e = lib.get(id); return e && !seen.has(id) && (e.wl || e.shelf); };
+const isCandidate = id => { const e = lib.get(id); return e && !seen.has(id) && (e.wl || e.mineShelf); };
 function membersOf(id) {
   if (state.members[id]) return state.members[id];
   return isCandidate(id) ? ['mine'] : [];
@@ -273,6 +274,7 @@ function card(id) {
   const inTray = state.tray.includes(id);
   const stickers = [];
   if (e.shelf) stickers.push(el('span', { class: 'sticker' }, e.shelf));
+  if (e.sarah) stickers.push(el('span', { class: 'sticker sarah' }, 'Sarahs'));
   if (isSeen) stickers.push(el('span', { class: 'sticker seen' }, 'gesehen'));
   return el('article', { class: 'card', 'data-id': id },
     el('div', { class: 'poster' },
@@ -288,7 +290,7 @@ function card(id) {
       el('div', { class: 'meta' }, f.g.slice(0, 3).join(', ')),
       el('div', { class: 'meta src' }, [
         e.wl ? 'Watchlist' + (e.added ? ' seit ' + e.added.slice(5, 7) + '/' + e.added.slice(0, 4) : '') : null,
-        e.shelf ? 'Regal' : null,
+        e.shelf ? (e.sarah && !e.mineShelf ? 'Regal (Sarahs)' : 'Regal') : null,
         state.extra.includes(id) && !e.wl && !e.shelf ? 'per Suche hinzugefügt' : null
       ].filter(Boolean).join(' · ')),
       el('div', { class: 'lists' }, state.lists.map(l => el('button', {
@@ -590,7 +592,7 @@ async function boot() {
   wire();
   try {
     const [shelf, watchlist, watched] = await Promise.all(['shelf', 'watchlist', 'watched'].map(n => fetch('data/' + n + '.json', { cache: 'no-cache' }).then(r => r.json())));
-    SRC = { shelf, watchlist, watched };
+    SRC = { shelf: shelf.filter(s => s.imdb), watchlist, watched };
   } catch (e) { toast('Datendateien konnten nicht geladen werden.'); }
   rebuild(); render();
   if (!state.apiKey) { $('#settingsDlg').showModal(); renderServices(); }
