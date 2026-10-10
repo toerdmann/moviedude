@@ -174,3 +174,4 @@ textarea { width: 100%; resize: vertical; font-size: .85rem; }
 .act:disabled { opacity: .4; cursor: default; }
 .hint.center { text-align: center; }
 .sticker.sarah { background: var(--panel); color: var(--fg); border: 1px solid var(--line); }
+label.btn { display: inline-block; }
