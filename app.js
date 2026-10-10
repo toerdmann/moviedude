@@ -24,6 +24,8 @@ const state = Object.assign({
   seenLocal: [],                        // in der App als gesehen markiert
   extra: [],                            // per TMDB-Suche hinzugefügt
   tray: [],                             // Auswahl für heute Abend
+  snooze: {},                           // tmdbId -> Zeitpunkt, ab dem er wieder im Feed auftaucht
+  feed: 'popular',
   tab: 'mine', source: 'avail', runtime: 0, sort: 'rating', genres: []
 }, load(STATE_KEY, {}));
 const cache = Object.assign({ match: {}, films: {}, providers: null }, load(CACHE_KEY, {}));
@@ -244,7 +246,8 @@ function renderTabs() {
     nav.append(el('button', { class: 'tab' + (state.tab === l.id ? ' on' : ''), type: 'button', onclick: () => setTab(l.id),
       ondblclick: () => l.id !== 'mine' && l.id !== 'ours' && removeList(l) }, l.name, el('small', {}, String(countIn(l.id)))));
   }
-  nav.append(el('button', { class: 'tab' + (state.tab === 'all' ? ' on' : ''), type: 'button', onclick: () => setTab('all') }, 'Alles'));
+  nav.append(el('button', { class: 'tab' + (state.tab === 'all' ? ' on' : ''), type: 'button', onclick: () => setTab('all') }, 'Fundus'));
+  nav.append(el('button', { class: 'tab' + (state.tab === 'discover' ? ' on' : ''), type: 'button', onclick: () => setTab('discover') }, 'Entdecken'));
   if (state.hidden.length) nav.append(el('button', { class: 'tab' + (state.tab === 'hidden' ? ' on' : ''), type: 'button', onclick: () => setTab('hidden') }, 'Nie', el('small', {}, String(state.hidden.length))));
   nav.append(el('button', { class: 'tab add', type: 'button', onclick: () => $('#newListDlg').showModal() }, '+ Liste'));
 }
@@ -306,7 +309,11 @@ function card(id) {
 }
 
 function render() {
-  renderTabs(); renderGenres();
+  renderTabs();
+  const disc = state.tab === 'discover';
+  $('#discover').hidden = !disc; $('#main').hidden = disc; document.querySelector('.filters').hidden = disc;
+  if (disc) { renderTray(); renderDeck(); return; }
+  renderGenres();
   document.querySelectorAll('#source button').forEach(b => b.classList.toggle('on', b.dataset.v === state.source));
   $('#runtime').value = String(state.runtime); $('#sort').value = state.sort;
   const ids = visibleIds();
@@ -314,7 +321,7 @@ function render() {
   $('#count').textContent = ids.length + (ids.length === 1 ? ' Film' : ' Filme');
   const empty = $('#empty');
   if (!state.apiKey) { empty.hidden = false; empty.textContent = 'Trag in den Einstellungen deinen TMDB-Schlüssel ein, dann gleicht MovieDude Regal, Watchlist und Streamingdienste ab.'; }
-  else if (!ids.length) { empty.hidden = false; empty.textContent = syncing ? 'Abgleich läuft, die Filme tauchen gleich auf.' : 'Keine Filme für diese Filter. Probier „Alle“ statt „Heute verfügbar“ oder entferne ein Genre.'; }
+  else if (!ids.length) { empty.hidden = false; empty.textContent = syncing ? 'Abgleich läuft, die Filme tauchen gleich auf.' : 'Keine Filme für diese Filter. Probier „Auch nicht verfügbar“ oder entferne ein Genre.'; }
   else empty.hidden = true;
   $('#tmdbSearch').hidden = !($('#q').value.trim().length > 1 && state.apiKey);
   renderTray();
@@ -382,8 +389,128 @@ async function tmdbSearch() {
     await Promise.all(ids.filter(id => !cache.films[id]).map(id => details(id).then(d => cache.films[id] = d)));
     state.extra = [...new Set([...state.extra, ...ids])];
     persist(); persistCache(); rebuild(); state.tab = 'all'; state.source = 'all'; render();
-    toast(ids.length ? `${ids.length} Treffer unter „Alles“. Per Listen-Chip übernehmen.` : 'Nichts gefunden.');
+    toast(ids.length ? `${ids.length} Treffer im „Fundus“. Per Listen-Chip übernehmen.` : 'Nichts gefunden.');
   } catch (e) { toast('Suche fehlgeschlagen: ' + e.message); }
+}
+
+/* ---------- Entdecken (Swipe-Feed) ---------- */
+const SNOOZE_MS = 30 * 24 * 3600 * 1000;
+let feed = { key: '', page: 0, ids: [], loading: false, done: false };
+let lastDecision = null;
+const feedKey = () => state.feed + '|' + (state.services || []).join(',');
+
+function eligible(id) {
+  if (lib.has(id) || seen.has(id) || state.hidden.includes(id)) return false;
+  const s = state.snooze[id]; return !(s && s > Date.now());
+}
+async function fillFeed() {
+  if (feed.loading || feed.done || !state.apiKey || !(state.services || []).length) return;
+  feed.loading = true;
+  const key = feed.key;
+  try {
+    while (feed.key === key && feed.ids.length < 6 && !feed.done) {
+      feed.page++;
+      const p = {
+        watch_region: REGION, with_watch_providers: state.services.join('|'),
+        with_watch_monetization_types: 'flatrate|free|ads', language: 'de-DE', page: feed.page,
+        include_adult: 'false'
+      };
+      if (state.feed === 'recent') Object.assign(p, { sort_by: 'primary_release_date.desc', 'primary_release_date.lte': new Date().toISOString().slice(0, 10), 'vote_count.gte': 10 });
+      else Object.assign(p, { sort_by: 'popularity.desc' });
+      const r = await tmdb('/discover/movie', p);
+      for (const m of r.results || []) if (eligible(m.id) && !feed.ids.includes(m.id)) feed.ids.push(m.id);
+      if (feed.page >= Math.min(r.total_pages || 0, 40)) feed.done = true;
+    }
+    if (feed.key !== key) return;
+    await Promise.all(feed.ids.slice(0, 3).filter(id => !cache.films[id]).map(id => details(id).then(d => { cache.films[id] = d; })));
+    persistCache();
+  } catch (e) { toast('Feed konnte nicht geladen werden: ' + e.message); feed.done = true; }
+  finally { if (feed.key === key) { feed.loading = false; if (state.tab === 'discover') renderDeck(); } }
+}
+
+function renderDeck() {
+  document.querySelectorAll('#feedMode button').forEach(b => b.classList.toggle('on', b.dataset.v === state.feed));
+  $('[data-act="undo"]').disabled = !lastDecision;
+  const deck = $('#deck'); const info = $('#discInfo');
+  if (feed.key !== feedKey()) feed = { key: feedKey(), page: 0, ids: [], loading: false, done: false };
+  const names = (cache.providers?.list || []).filter(p => (state.services || []).includes(p.id)).map(p => p.name);
+  info.textContent = names.length ? 'Auf: ' + names.join(', ') : '';
+  const msg = t => { deck.replaceChildren(el('div', { class: 'empty' }, t)); document.querySelectorAll('#discActions .act:not([data-act="undo"])').forEach(b => b.disabled = true); };
+  if (!state.apiKey) return msg('Erst den TMDB-Schlüssel in den Einstellungen eintragen.');
+  if (!(state.services || []).length) return msg('Wähl in den Einstellungen mindestens einen Streamingdienst aus.');
+  feed.ids = feed.ids.filter(eligible);
+  const top = feed.ids[0];
+  if (feed.ids.length < 4) fillFeed();
+  if (!top) return msg(feed.loading || !feed.done ? 'Feed wird geladen…' : 'Durch! Für diesen Feed ist nichts Neues mehr da.');
+  if (!cache.films[top]) { msg('Lade Film…'); details(top).then(d => { cache.films[top] = d; persistCache(); renderDeck(); }).catch(() => { feed.ids.shift(); renderDeck(); }); return; }
+  document.querySelectorAll('#discActions .act').forEach(b => { if (b.dataset.act !== 'undo') b.disabled = false; });
+  const next = feed.ids[1] && cache.films[feed.ids[1]];
+  const kids = [];
+  if (next) kids.push(el('div', { class: 'swipe back' }, el('div', { class: 'poster' }, next.p ? el('img', { src: IMG + 'w500' + next.p, alt: '' }) : null)));
+  kids.push(swipeCard(top));
+  deck.replaceChildren(...kids);
+  // nächste Details vorladen
+  feed.ids.slice(1, 4).filter(id => !cache.films[id]).forEach(id => details(id).then(d => { cache.films[id] = d; }).catch(() => {}));
+}
+
+function swipeCard(id) {
+  const f = cache.films[id];
+  const st = streamable(f);
+  const c = el('article', { class: 'swipe', 'data-id': id },
+    el('div', { class: 'poster' },
+      f.p ? el('img', { src: IMG + 'w500' + f.p, alt: '' }) : el('div', { class: 'noimg' }, f.t),
+      el('div', { class: 'provs' }, st.map(p => el('img', { src: IMG + 'w92' + p[2], alt: p[1], title: p[1] }))),
+      el('span', { class: 'stamp yes' }, 'Meine'), el('span', { class: 'stamp no' }, 'Nie')),
+    el('div', { class: 'body' },
+      el('h3', { class: 'title' }, f.t),
+      f.o && norm(f.o) !== norm(f.t) ? el('div', { class: 'meta' }, f.o) : null,
+      el('div', { class: 'meta' }, [f.y, f.r ? f.r + ' min' : null, f.v ? '★ ' + f.v.toFixed(1) : null, f.g.slice(0, 3).join(', ')].filter(Boolean).join(' · ')),
+      f.ov ? el('p', { class: 'ov' }, f.ov) : null,
+      el('div', { class: 'links' },
+        f.imdb ? el('a', { href: 'https://www.imdb.com/title/' + f.imdb + '/', target: '_blank', rel: 'noopener' }, 'IMDb') : null,
+        f.tr ? el('a', { href: 'https://www.youtube.com/watch?v=' + f.tr, target: '_blank', rel: 'noopener' }, 'Trailer') : null,
+        el('a', { href: `https://letterboxd.com/tmdb/${id}/`, target: '_blank', rel: 'noopener' }, 'Letterboxd'))));
+  let x0 = null, dx = 0;
+  const yes = c.querySelector('.stamp.yes'), no = c.querySelector('.stamp.no');
+  c.addEventListener('pointerdown', e => { if (e.target.closest('a')) return; x0 = e.clientX; dx = 0; c.classList.add('dragging'); c.setPointerCapture(e.pointerId); });
+  c.addEventListener('pointermove', e => {
+    if (x0 == null) return; dx = e.clientX - x0;
+    c.style.transform = `translateX(${dx}px) rotate(${dx / 20}deg)`;
+    yes.style.opacity = Math.max(0, Math.min(1, dx / 100)); no.style.opacity = Math.max(0, Math.min(1, -dx / 100));
+  });
+  const end = () => {
+    if (x0 == null) return; x0 = null; c.classList.remove('dragging');
+    if (dx > 100) decide('mine'); else if (dx < -100) decide('nie');
+    else { c.style.transform = ''; yes.style.opacity = no.style.opacity = 0; }
+  };
+  c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
+  return c;
+}
+
+function decide(act) {
+  if (act === 'undo') return undoDecision();
+  const id = feed.ids[0]; if (!id || !cache.films[id]) return;
+  lastDecision = { id, extra: state.extra.slice(), member: state.members[id], hidden: state.hidden.slice(), seenLocal: state.seenLocal.slice(), snooze: state.snooze[id] };
+  const card = document.querySelector('.swipe:not(.back)');
+  const dir = act === 'mine' || act === 'ours' ? 1 : act === 'nie' ? -1 : 0;
+  if (card) { card.style.transform = dir ? `translateX(${dir * 600}px) rotate(${dir * 25}deg)` : 'translateY(-40px) scale(.9)'; card.style.opacity = 0; }
+  const addExtra = () => { if (!state.extra.includes(id)) state.extra.push(id); };
+  if (act === 'mine') { addExtra(); state.members[id] = ['mine']; }
+  if (act === 'ours') { addExtra(); state.members[id] = ['ours']; }
+  if (act === 'nie') { addExtra(); state.hidden = [...new Set([...state.hidden, id])]; }
+  if (act === 'seen') { addExtra(); state.seenLocal = [...new Set([...state.seenLocal, id])]; state.members[id] = []; }
+  if (act === 'later') state.snooze[id] = Date.now() + SNOOZE_MS;
+  feed.ids.shift();
+  persist(); rebuild();
+  setTimeout(() => { renderTabs(); renderDeck(); }, card ? 220 : 0);
+}
+function undoDecision() {
+  const d = lastDecision; if (!d) return;
+  state.extra = d.extra; state.hidden = d.hidden; state.seenLocal = d.seenLocal;
+  if (d.member === undefined) delete state.members[d.id]; else state.members[d.id] = d.member;
+  if (d.snooze === undefined) delete state.snooze[d.id]; else state.snooze[d.id] = d.snooze;
+  lastDecision = null; persist(); rebuild();
+  feed.ids.unshift(d.id); renderTabs(); renderDeck();
 }
 
 /* ---------- Einstellungen ---------- */
@@ -436,6 +563,14 @@ function wire() {
     toast(roll === 20 ? 'Natürliche 20! ' + c.querySelector('.title').textContent : roll === 1 ? 'Kritischer Patzer… trotzdem: ' + c.querySelector('.title').textContent : 'Gewürfelt: ' + c.querySelector('.title').textContent);
   });
   $('#trayOpen').addEventListener('click', openTray);
+  document.querySelectorAll('#feedMode button').forEach(b => b.addEventListener('click', () => { state.feed = b.dataset.v; persist(); renderDeck(); }));
+  document.querySelectorAll('#discActions .act').forEach(b => b.addEventListener('click', () => decide(b.dataset.act)));
+  document.addEventListener('keydown', e => {
+    if (state.tab !== 'discover' || document.querySelector('dialog[open]') || e.target.matches('input, textarea, select')) return;
+    const map = { ArrowLeft: 'nie', ArrowRight: 'mine', ArrowDown: 'later', ArrowUp: 'ours' };
+    if (map[e.key]) { e.preventDefault(); decide(map[e.key]); }
+    else if ((e.key === 'z' || e.key === 'Z') && (e.metaKey || e.ctrlKey)) { e.preventDefault(); decide('undo'); }
+  });
   $('#trayCopy').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText($('#trayText').value); toast('Kopiert. Ab damit per WhatsApp.'); }
     catch { $('#trayText').select(); toast('Text markiert, jetzt kopieren.'); }
