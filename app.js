@@ -136,7 +136,7 @@ function rebuild() {
     e.shelf = e.shelf && e.shelf !== s.disc ? 'DVD + Blu-ray' : s.disc;
     if (s.seen) { e.shelfSeen = true; seen.add(id); }
   }
-  for (const s of SRC.watchlist) { const id = cache.match[keyLb(s)]; if (!id) continue; const e = get(id); e.wl = true; e.lb = s.lb; }
+  for (const s of SRC.watchlist) { const id = cache.match[keyLb(s)]; if (!id) continue; const e = get(id); e.wl = true; e.lb = s.lb; e.added = s.added || null; }
   for (const s of SRC.watched) { const id = cache.match[keyLb(s)]; if (id) seen.add(id); }
   for (const id of state.seenLocal) seen.add(id);
   for (const id of state.extra) get(id);
@@ -283,6 +283,11 @@ function card(id) {
       f.o && norm(f.o) !== norm(f.t) ? el('div', { class: 'meta orig' }, f.o) : null,
       el('div', { class: 'meta' }, [f.y, f.r ? f.r + ' min' : null, f.v ? '★ ' + f.v.toFixed(1) : null].filter(Boolean).join(' · ')),
       el('div', { class: 'meta' }, f.g.slice(0, 3).join(', ')),
+      el('div', { class: 'meta src' }, [
+        e.wl ? 'Watchlist' + (e.added ? ' seit ' + e.added.slice(5, 7) + '/' + e.added.slice(0, 4) : '') : null,
+        e.shelf ? 'Regal' : null,
+        state.extra.includes(id) && !e.wl && !e.shelf ? 'per Suche hinzugefügt' : null
+      ].filter(Boolean).join(' · ')),
       el('div', { class: 'lists' }, state.lists.map(l => el('button', {
         class: 'lchip' + (mem.includes(l.id) ? ' on' : ''), type: 'button', onclick: () => toggleList(id, l.id)
       }, l.name))),
@@ -449,7 +454,7 @@ function wire() {
 async function boot() {
   wire();
   try {
-    const [shelf, watchlist, watched] = await Promise.all(['shelf', 'watchlist', 'watched'].map(n => fetch('data/' + n + '.json').then(r => r.json())));
+    const [shelf, watchlist, watched] = await Promise.all(['shelf', 'watchlist', 'watched'].map(n => fetch('data/' + n + '.json', { cache: 'no-cache' }).then(r => r.json())));
     SRC = { shelf, watchlist, watched };
   } catch (e) { toast('Datendateien konnten nicht geladen werden.'); }
   rebuild(); render();
