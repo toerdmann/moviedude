@@ -210,3 +210,5 @@ input[type=email] { background: var(--panel); border: 1px solid var(--line); bor
 .login-form input { width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 .login-form .btn { justify-self: start; }
 input[type=password] { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+button.tagline { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+button.tagline:hover { color: var(--fg); }

@@ -1072,8 +1072,27 @@ async function bootCloud() {
   else showView('login', hashErr ? 'Der Link hat nicht geklappt (' + hashErr + '). Fordere einfach einen neuen an.' : '');
 }
 
+/* ---------- Sprüche im Kopf ---------- */
+const TAGLINES = [
+  'Was läuft heute?', 'Weniger scrollen, mehr schauen.', 'Kein Film ist auch keine Lösung.',
+  'The Dude abides. Die Watchlist auch.', 'Nur noch ein Trailer …', 'Ein Film, sie alle zu knechten.',
+  'Ein Service der Nubsicorp.', 'Schau mir in die Watchlist, Kleines.', 'Nobody puts Popcorn in the corner.',
+  'Wir brauchen ein größeres Sofa.', 'Möge die Fernbedienung mit dir sein.', 'Bis zum Abspann und noch viel weiter.',
+  "Here's to watchin' with you, kid.", 'May the remote be with you.', "I'll be back. With snacks.",
+  'Houston, we have a movie night.', 'You had me at “Play”.', 'Show me the popcorn!',
+  'Just keep streaming.', "There's no place like the couch.", "Frankly, my dear, I'll pick the movie.",
+  'Life is like a box of DVDs.', 'To infinity and the end credits.', "A movie you can't refuse."
+];
+function nextTagline() {
+  const t = $('#tagline'), cur = t.textContent;
+  let n; do { n = TAGLINES[Math.floor(Math.random() * TAGLINES.length)]; } while (n === cur);
+  t.textContent = n;
+}
+
 /* ---------- Verdrahtung ---------- */
 function wire() {
+  nextTagline();
+  $('#tagline').addEventListener('click', nextTagline);
   document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
   $('#openSettings').addEventListener('click', openSettings);
   $('#saveKey').addEventListener('click', async () => {
