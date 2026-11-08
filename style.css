@@ -201,3 +201,8 @@ input[type=email] { background: var(--panel); border: 1px solid var(--line); bor
 .meta.warn { color: var(--hot); }
 @media (max-width: 520px) { .sg { grid-template-columns: 40px minmax(0, 1fr); } .sg .btn { grid-column: 1 / -1; } }
 .toast { width: max-content; max-width: calc(100vw - 32px); }
+.suggest { margin-top: 14px; }
+.filter-toggle { margin-top: 12px; }
+#main .count { margin-top: 14px; }
+.suggest .hint:empty, .suggest-list:empty { display: none; }
+.suggest .inline input { flex: 1 1 0; min-width: 0; }

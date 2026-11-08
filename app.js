@@ -536,15 +536,22 @@ function card(id) {
 }
 
 let appShown = false;
+let filtersOpen = false;
 function render() {
   if (!appShown) return;
   if (!allowedTabs().includes(state.tab)) state.tab = isOwner() ? 'mine' : OURS;
   renderTabs(); renderNotice();
   const disc = state.tab === 'discover';
   $('#discover').hidden = !disc; $('#main').hidden = disc; document.querySelector('.filters').hidden = disc;
-  if (disc) { renderTray(); renderDeck(); return; }
+  if (disc) { $('#filterToggle').hidden = true; $('#suggest').hidden = true; renderTray(); renderDeck(); return; }
   renderGenres();
   $('#suggest').hidden = state.tab !== OURS;
+  const collapse = !isOwner();
+  const active = (state.source !== 'all' ? 1 : 0) + (state.runtime ? 1 : 0) + state.genres.length + ($('#q').value.trim() ? 1 : 0);
+  $('#filterToggle').hidden = !collapse;
+  $('#filterToggle').textContent = (filtersOpen ? 'Filter ausblenden' : 'Filter') + (active ? ` (${active} aktiv)` : '');
+  $('#filterToggle').setAttribute('aria-expanded', String(filtersOpen));
+  document.querySelector('.filters').hidden = collapse && !filtersOpen;
   document.querySelectorAll('#source button').forEach(b => b.classList.toggle('on', b.dataset.v === state.source));
   $('#runtime').value = String(state.runtime); $('#sort').value = state.sort;
   const ids = visibleIds();
@@ -1126,6 +1133,7 @@ function wire() {
       : 'Link ist unterwegs. Öffne ihn auf diesem Gerät, am besten im selben Browser.';
   });
   $('#suggestForm').addEventListener('submit', suggest);
+  $('#filterToggle').addEventListener('click', () => { filtersOpen = !filtersOpen; render(); });
   $('#noticeShow').addEventListener('click', openNotice);
   $('#noticeOk').addEventListener('click', ackNotice);
   $('#noticeDlg').addEventListener('close', ackNotice);
