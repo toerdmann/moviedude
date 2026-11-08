@@ -177,3 +177,26 @@ textarea { width: 100%; resize: vertical; font-size: .85rem; }
 label.btn { display: inline-block; }
 .toast { display: flex; align-items: center; gap: 12px; }
 .toast-act { background: none; border: 1px solid currentColor; color: inherit; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+
+/* Etappe 2: Anmeldung, Hinweise, Vorschlagen */
+.gate { max-width: 460px; margin: 48px auto; padding: 24px; background: var(--panel); border-radius: 14px; box-shadow: var(--shadow); display: grid; gap: 12px; }
+.gate h1 { font: 900 2rem/1 var(--f-display); text-transform: uppercase; margin: 0; }
+.gate p { margin: 0; color: var(--muted); }
+.gate .inline { flex-wrap: wrap; }
+.gate input { flex: 1 1 200px; }
+input[type=email] { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 18%, var(--panel)); border: 1px solid var(--accent); }
+.notice span { flex: 1 1 220px; font-weight: 500; }
+.notice .btn { padding: 6px 12px; }
+.notice-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.notice-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.suggest { display: grid; gap: 8px; margin-bottom: 18px; padding: 14px; border: 1px dashed var(--line); border-radius: 12px; }
+.suggest .inline input { flex: 1 1 200px; }
+.suggest .hint { margin: 0; }
+.suggest-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.sg { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 12px; align-items: center; background: var(--panel); border-radius: 10px; padding: 8px; box-shadow: var(--shadow); }
+.sg img, .sg-noimg { width: 46px; aspect-ratio: 2/3; border-radius: 4px; object-fit: cover; background: var(--chip); }
+.sg-body { display: grid; gap: 2px; min-width: 0; }
+.sg-body strong { overflow-wrap: anywhere; }
+.meta.warn { color: var(--hot); }
+@media (max-width: 520px) { .sg { grid-template-columns: 40px minmax(0, 1fr); } .sg .btn { grid-column: 1 / -1; } }

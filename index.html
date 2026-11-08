@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=202611081246">
+<link rel="stylesheet" href="style.css?v=202611081522">
 </head>
 <body>
 <header class="top">
@@ -24,7 +24,30 @@
   </div>
 </header>
 
+<section class="gate" id="login" hidden aria-label="Anmelden">
+  <h1>Anmelden</h1>
+  <p>Gib deine Mail-Adresse ein. Du bekommst einen Link, mit dem du auf diesem Gerät angemeldet bleibst.</p>
+  <form id="loginForm" class="inline">
+    <input id="loginEmail" type="email" autocomplete="email" placeholder="name@beispiel.de" required>
+    <button class="btn" type="submit">Link schicken</button>
+  </form>
+  <p class="hint" id="loginStatus" role="status"></p>
+</section>
+
+<section class="gate" id="noAccess" hidden aria-label="Kein Zugang">
+  <h1>Kein Zugang</h1>
+  <p id="noAccessText">Diese Adresse steht nicht auf der Gästeliste von MovieDude.</p>
+  <button class="btn ghost" id="noAccessLogout" type="button">Mit anderer Adresse anmelden</button>
+</section>
+
+<div id="app">
 <nav class="tabs" id="tabs" aria-label="Listen"></nav>
+
+<div class="notice" id="notice" hidden>
+  <span id="noticeText"></span>
+  <button class="btn ghost" id="noticeShow" type="button">Anzeigen</button>
+  <button class="btn ghost" id="noticeOk" type="button">Okay</button>
+</div>
 
 <section class="filters" aria-label="Filter">
   <div class="row">
@@ -66,13 +89,21 @@
     <button class="act nie" type="button" data-act="nie" title="Nie (Pfeil links)">Nie</button>
     <button class="act" type="button" data-act="seen" title="Schon gesehen">Gesehen</button>
     <button class="act" type="button" data-act="later" title="Später nochmal zeigen (Pfeil runter)">Lass erstmal</button>
-    <button class="act" type="button" data-act="ours" title="Auf Unsere">Unsere</button>
+    <button class="act" type="button" data-act="ours" title="Auf Unsere (Pfeil hoch)">Unsere</button>
     <button class="act go" type="button" data-act="mine" title="Auf Meine (Pfeil rechts)">Meine</button>
   </div>
-  <p class="hint center">Wischen: links Nie, rechts Meine. Am Rechner: Pfeiltasten ← Nie, → Meine, ↑ Unsere, ↓ Lass erstmal.</p>
+  <p class="hint center" id="discHint">Wischen: links Nie, rechts Meine. Am Rechner: Pfeiltasten ← Nie, → Meine, ↑ Unsere, ↓ Lass erstmal.</p>
 </section>
 
 <main id="main">
+  <section class="suggest" id="suggest" hidden aria-label="Film vorschlagen">
+    <form id="suggestForm" class="inline">
+      <input id="suggestInput" type="text" autocomplete="off" placeholder="IMDb-Link, Letterboxd-Link oder Titel">
+      <button class="btn" type="submit">Finden</button>
+    </form>
+    <p class="hint" id="suggestStatus"></p>
+    <ul class="suggest-list" id="suggestList"></ul>
+  </section>
   <p class="count" id="count"></p>
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" hidden></div>
@@ -80,6 +111,7 @@
     <button class="btn" id="tmdbSearchBtn" type="button">Bei TMDB suchen</button>
   </div>
 </main>
+</div>
 
 <div class="tray" id="tray" hidden>
   <button class="tray-btn" id="trayOpen" type="button"><span>Heute Abend</span> <b id="trayCount">0</b></button>
@@ -96,31 +128,48 @@
   </div>
 </dialog>
 
+<dialog id="noticeDlg" class="dlg">
+  <div class="dlg-head"><h2>Neu in Unsere</h2><button class="btn ghost" data-close type="button">Schließen</button></div>
+  <ul id="noticeList" class="notice-list"></ul>
+</dialog>
+
 <dialog id="settingsDlg" class="dlg">
   <div class="dlg-head"><h2>Einstellungen</h2><button class="btn ghost" data-close type="button">Schließen</button></div>
-  <label class="lbl" for="apiKey">TMDB API-Schlüssel (der kurze)</label>
-  <div class="inline">
-    <input id="apiKey" type="text" autocomplete="off" spellcheck="false" placeholder="z. B. e62d0bc…">
-    <button class="btn" id="saveKey" type="button">Speichern</button>
+  <div id="account" hidden>
+    <p class="hint" id="accountText"></p>
+    <button class="btn ghost" id="logoutBtn" type="button">Abmelden</button>
   </div>
-  <p class="hint" id="keyStatus"></p>
-  <h3>Meine Streamingdienste</h3>
-  <p class="hint">Was du gerade abonniert hast. Umschalten wirkt sofort.</p>
-  <div class="services" id="services"></div>
-  <h3>Daten</h3>
-  <div class="dlg-actions">
-    <button class="btn ghost" id="refreshProv" type="button">Verfügbarkeit neu laden</button>
-    <button class="btn ghost" id="rematch" type="button">Alles neu abgleichen</button>
+  <div id="keyBlock">
+    <label class="lbl" for="apiKey">TMDB API-Schlüssel (der kurze)</label>
+    <div class="inline">
+      <input id="apiKey" type="text" autocomplete="off" spellcheck="false" placeholder="z. B. e62d0bc…">
+      <button class="btn" id="saveKey" type="button">Speichern</button>
+    </div>
+    <p class="hint" id="keyStatus"></p>
   </div>
-  <h3>Backup</h3>
-  <p class="hint">Deine Listen, Entscheidungen und Einstellungen liegen nur in diesem Browser. Sichere sie ab und zu als Datei.</p>
-  <div class="dlg-actions">
-    <button class="btn" id="exportBtn" type="button">Backup herunterladen</button>
-    <label class="btn ghost" for="importFile">Backup einspielen</label>
-    <input id="importFile" type="file" accept="application/json,.json" hidden>
+  <div id="svcBlock">
+    <h3>Unsere Streamingdienste</h3>
+    <p class="hint">Was ihr gerade abonniert habt. Umschalten wirkt sofort.</p>
+    <div class="services" id="services"></div>
   </div>
-  <p class="hint" id="backupStatus"></p>
-  <p class="hint" id="stats"></p>
+  <div id="dataBlock">
+    <h3>Daten</h3>
+    <div class="dlg-actions">
+      <button class="btn ghost" id="refreshProv" type="button">Verfügbarkeit neu laden</button>
+      <button class="btn ghost" id="rematch" type="button">Alles neu abgleichen</button>
+      <button class="btn ghost" id="mergeLocal" type="button" hidden>Daten aus diesem Browser übernehmen</button>
+    </div>
+    <p class="hint" id="mergeStatus"></p>
+    <h3>Backup</h3>
+    <p class="hint" id="backupHint">Deine Listen, Entscheidungen und Einstellungen liegen nur in diesem Browser. Sichere sie ab und zu als Datei.</p>
+    <div class="dlg-actions">
+      <button class="btn" id="exportBtn" type="button">Backup herunterladen</button>
+      <label class="btn ghost" for="importFile">Backup einspielen</label>
+      <input id="importFile" type="file" accept="application/json,.json" hidden>
+    </div>
+    <p class="hint" id="backupStatus"></p>
+    <p class="hint" id="stats"></p>
+  </div>
   <p class="attr">Film- und Streamingdaten: <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>, Verfügbarkeit von <a href="https://www.justwatch.com" target="_blank" rel="noopener">JustWatch</a>. Diese App nutzt die TMDB-API, ist aber nicht von TMDB zertifiziert.</p>
 </dialog>
 
@@ -137,6 +186,8 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="app.js?v=202611081246"></script>
+<script src="config.js?v=202611081522"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
+<script src="app.js?v=202611081522"></script>
 </body>
 </html>
