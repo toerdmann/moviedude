@@ -206,3 +206,7 @@ input[type=email] { background: var(--panel); border: 1px solid var(--line); bor
 #main .count { margin-top: 14px; }
 .suggest .hint:empty, .suggest-list:empty { display: none; }
 .suggest .inline input { flex: 1 1 0; min-width: 0; }
+.login-form { display: grid; gap: 8px; }
+.login-form input { width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.login-form .btn { justify-self: start; }
+input[type=password] { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }

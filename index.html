@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=202611081553">
+<link rel="stylesheet" href="style.css?v=202611081600">
 </head>
 <body>
 <header class="top">
@@ -27,9 +27,10 @@
 <section class="gate" id="login" hidden aria-label="Anmelden">
   <h1>Anmelden</h1>
   <p>Gib deine Mail-Adresse ein. Du bekommst einen Link, mit dem du auf diesem Gerät angemeldet bleibst.</p>
-  <form id="loginForm" class="inline">
+  <form id="loginForm" class="login-form">
     <input id="loginEmail" type="email" autocomplete="email" placeholder="name@beispiel.de" required>
-    <button class="btn" type="submit">Link schicken</button>
+    <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Passwort (nur falls du eins festgelegt hast)">
+    <button class="btn" type="submit" id="loginBtn">Link schicken</button>
   </form>
   <p class="hint" id="loginStatus" role="status"></p>
 </section>
@@ -141,6 +142,13 @@
   <div id="account" hidden>
     <p class="hint" id="accountText"></p>
     <button class="btn ghost" id="logoutBtn" type="button">Abmelden</button>
+    <h3>Passwort</h3>
+    <p class="hint">Mit Passwort meldest du dich auf neuen Geräten ohne Mail-Link an.</p>
+    <form id="pwForm" class="inline">
+      <input id="newPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Mindestens 8 Zeichen" required>
+      <button class="btn" type="submit">Passwort festlegen</button>
+    </form>
+    <p class="hint" id="pwStatus"></p>
   </div>
   <div id="keyBlock">
     <label class="lbl" for="apiKey">TMDB API-Schlüssel (der kurze)</label>
@@ -191,6 +199,6 @@
 
 <script src="config.js?v=202611081529"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
-<script src="app.js?v=202611081553"></script>
+<script src="app.js?v=202611081600"></script>
 </body>
 </html>

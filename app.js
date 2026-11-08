@@ -1123,14 +1123,34 @@ function wire() {
   $('#rematch').addEventListener('click', () => { $('#settingsDlg').close(); sync({ force: true }); });
   $('#logoutBtn').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
   $('#noAccessLogout').addEventListener('click', async () => { if (sb) await sb.auth.signOut(); location.reload(); });
+  $('#loginPassword').addEventListener('input', e => { $('#loginBtn').textContent = e.target.value ? 'Anmelden' : 'Link schicken'; });
   $('#loginForm').addEventListener('submit', async e => {
     e.preventDefault();
     const email = $('#loginEmail').value.trim(); if (!email) return;
+    const password = $('#loginPassword').value;
+    if (password) {
+      $('#loginStatus').textContent = 'Melde an…';
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) $('#loginStatus').textContent = /invalid/i.test(error.message)
+        ? 'Mail oder Passwort stimmen nicht. Ohne Passwort bekommst du einen Link per Mail.'
+        : 'Das hat nicht geklappt: ' + error.message;
+      return;                                    // Erfolg läuft über onAuthStateChange
+    }
     $('#loginStatus').textContent = 'Schicke Link…';
     const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
-    $('#loginStatus').textContent = error
-      ? 'Das hat nicht geklappt: ' + error.message
-      : 'Link ist unterwegs. Öffne ihn auf diesem Gerät, am besten im selben Browser.';
+    $('#loginStatus').textContent = !error
+      ? 'Link ist unterwegs. Öffne ihn auf diesem Gerät, am besten im selben Browser.'
+      : /rate limit/i.test(error.message)
+        ? 'Gerade wurden zu viele Mails verschickt (Supabase erlaubt nur 2 pro Stunde). Versuch es später nochmal oder melde dich mit Passwort an.'
+        : 'Das hat nicht geklappt: ' + error.message;
+  });
+  $('#pwForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const password = $('#newPassword').value;
+    $('#pwStatus').textContent = 'Speichere…';
+    const { error } = await sb.auth.updateUser({ password });
+    $('#pwStatus').textContent = error ? 'Das hat nicht geklappt: ' + error.message : 'Passwort gespeichert. Auf neuen Geräten einfach Mail und Passwort eintragen.';
+    if (!error) $('#newPassword').value = '';
   });
   $('#suggestForm').addEventListener('submit', suggest);
   $('#filterToggle').addEventListener('click', () => { filtersOpen = !filtersOpen; render(); });
