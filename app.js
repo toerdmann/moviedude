@@ -1081,7 +1081,7 @@ const TAGLINES = [
   "Here's to watchin' with you, kid.", 'May the remote be with you.', "I'll be back. With snacks.",
   'Houston, we have a movie night.', 'You had me at “Play”.', 'Show me the popcorn!',
   'Just keep streaming.', "There's no place like the couch.", "Frankly, my dear, I'll pick the movie.",
-  'Life is like a box of DVDs.', 'To infinity and the end credits.', "A movie you can't refuse."
+  'Life is like a box of movies.', 'To infinity and the end credits.', "A movie you can't refuse."
 ];
 function nextTagline() {
   const t = $('#tagline'), cur = t.textContent;
