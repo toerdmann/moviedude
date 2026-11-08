@@ -212,3 +212,23 @@ input[type=email] { background: var(--panel); border: 1px solid var(--line); bor
 input[type=password] { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
 button.tagline { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
 button.tagline:hover { color: var(--fg); }
+
+/* Detailansicht, O-Ton, Nachtragen */
+.poster { cursor: zoom-in; }
+.mini { background: none; border: 0; padding: 0; font-size: .74rem; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; justify-self: start; }
+.mini:hover { color: var(--fg); }
+span.mini { text-decoration: none; cursor: default; }
+span.mini button.mini { font-size: inherit; }
+.film-dlg { width: min(720px, calc(100vw - 32px)); }
+.film-dlg .dlg-head { margin-bottom: 4px; }
+.fd { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.fd-poster { width: 100%; border-radius: 10px; }
+.fd-body { display: grid; gap: 8px; min-width: 0; }
+.fd-body h2 { font: 900 1.9rem/1 var(--f-display); text-transform: uppercase; margin: 0; overflow-wrap: anywhere; }
+.fd-ov { margin: 4px 0; line-height: 1.55; max-width: 60ch; }
+@media (max-width: 560px) { .fd { grid-template-columns: 1fr; } .fd-poster { max-width: 200px; } }
+.rate-view { display: grid; gap: 14px; }
+.rate-view > .hint { margin: 0; max-width: 70ch; }
+.rate-group summary { cursor: pointer; font: 700 1.15rem var(--f-display); text-transform: uppercase; letter-spacing: .03em; padding: 6px 0; }
+.rate-group summary small { font: 500 .75rem var(--f-mono); color: var(--muted); margin-left: 6px; }
+.rate-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }

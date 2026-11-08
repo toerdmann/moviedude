@@ -25,7 +25,7 @@ const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSO
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
 
 const UI_FIELDS = ['tab', 'source', 'runtime', 'sort', 'genres', 'feed'];
-const SYNC_PREF_FIELDS = ['lists', 'tray', 'lastSeen'];
+const SYNC_PREF_FIELDS = ['lists', 'tray', 'lastSeen', 'ratedDone'];
 const freshState = () => ({
   apiKey: '',
   services: null,                       // [provider_id]
@@ -34,6 +34,8 @@ const freshState = () => ({
   hidden: [], seenLocal: [], unseenLocal: [], extra: [], tray: [],
   snooze: {},
   sharedLocal: {},                      // nur Etappe 1: "Unsere" im Browser
+  noovLocal: {},                        // nur Etappe 1: Prime ohne O-Ton
+  ratedDone: [],                        // "Nachtragen": als erledigt abgehakt
   lastSeen: 0,
   feed: 'popular', tab: 'mine', source: 'avail', runtime: 0, sort: 'new', genres: [], sortV: 2
 });
@@ -119,12 +121,15 @@ async function details(id) {
   const d = await tmdb('/movie/' + id, { language: 'de-DE', append_to_response: 'watch/providers,external_ids,videos', include_video_language: 'de,en,null' });
   const pr = d['watch/providers']?.results?.[REGION] || {};
   const vids = (d.videos?.results || []).filter(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
-  vids.sort((a, b) => (a.type === 'Trailer' ? 0 : 1) - (b.type === 'Trailer' ? 0 : 1) || (a.iso_639_1 === 'de' ? 0 : 1) - (b.iso_639_1 === 'de' ? 0 : 1));
+  const ol = d.original_language || null;
+  const trLang = ol === 'en' ? 'en' : 'de';          // englische Filme: Original-Trailer, sonst deutsch
+  vids.sort((a, b) => (a.iso_639_1 === trLang ? 0 : 1) - (b.iso_639_1 === trLang ? 0 : 1) || (a.type === 'Trailer' ? 0 : 1) - (b.type === 'Trailer' ? 0 : 1));
   return {
+    id: d.id, ol,
     t: d.title, o: d.original_title, y: parseInt((d.release_date || '').slice(0, 4), 10) || null,
     r: d.runtime || null, v: Math.round((d.vote_average || 0) * 10) / 10,
     g: (d.genres || []).map(g => g.name), p: d.poster_path || null,
-    ov: (d.overview || '').slice(0, 420), imdb: d.external_ids?.imdb_id || d.imdb_id || null,
+    ov: (d.overview || '').slice(0, 900), imdb: d.external_ids?.imdb_id || d.imdb_id || null,
     tr: vids[0]?.key || null,
     fl: (pr.flatrate || []).concat(pr.free || [], pr.ads || []).map(x => [x.provider_id, x.provider_name, x.logo_path]),
     ts: Date.now()
@@ -142,6 +147,21 @@ async function loadProviders() {
     .slice(0, 40).map(p => ({ id: p.provider_id, name: p.provider_name, logo: p.logo_path }));
   cache.providers = { ts: Date.now(), list }; persistCache();
   return list;
+}
+
+/* ---------- Prime ohne englischen O-Ton (gilt für den Haushalt, mit Datum zum späteren Nachprüfen) ---------- */
+const NOOV = 'noov';
+let noov = new Map();                   // tmdbId -> { in_list, changed_by, changed_at }
+const isPrime = p => /amazon prime/i.test(p[1]);
+const noovActive = id => !!noov.get(id)?.in_list;
+async function setNoov(id, on) {
+  const prev = noov.get(id);
+  noov.set(id, { in_list: on, changed_by: me.id, changed_at: new Date().toISOString() });
+  if (!CLOUD) { state.noovLocal[id] = noov.get(id); persist(); rebuild(); render(); return; }
+  rebuild(); render();
+  const { data, error } = await sb.from('shared_items').upsert({ list_id: NOOV, tmdb_id: id, in_list: on }, { onConflict: 'list_id,tmdb_id' }).select().single();
+  if (error) { if (prev) noov.set(id, prev); else noov.delete(id); toast('Speichern fehlgeschlagen: ' + error.message); rebuild(); render(); return; }
+  if (data) noov.set(id, pickShared(data));
 }
 
 /* ---------- Gemeinsame Liste "Unsere" ---------- */
@@ -175,6 +195,7 @@ async function setOurs(id, on) {
 }
 const pickShared = r => ({ in_list: r.in_list, added_by: r.added_by, changed_by: r.changed_by, changed_at: r.changed_at });
 function applyRemoteShared(r) {
+  if (r && r.list_id === NOOV) { noov.set(r.tmdb_id, pickShared(r)); return true; }
   if (!r || r.list_id !== OURS) return false;
   const id = r.tmdb_id;
   if (pendingShared.has(id)) return false;
@@ -282,7 +303,7 @@ function setOffline(off, msg) {
 }
 
 /* ---------- Quelldaten ---------- */
-let SRC = { shelf: [], watchlist: [], watched: [] };
+let SRC = { shelf: [], watchlist: [], watched: [], ratings: [] };
 const keyShelf = s => s.imdb ? 'i:' + s.imdb : 's:' + norm(s.title) + '|' + s.year;
 const keyLb = s => 'l:' + s.lb;
 
@@ -290,6 +311,8 @@ let lib = new Map();   // tmdbId -> { shelf, wl, lb, … }
 let seen = new Set();
 let seenLb = new Set();
 let shelfMap = {};     // tmdbId -> Disk-Typ, für Sarahs Ansicht
+let rated = new Set();
+let shelfSeenOwn = new Set();
 
 function rebuild() {
   lib = new Map(); seen = new Set(state.seenLocal); seenLb = new Set();
@@ -313,6 +336,9 @@ function rebuild() {
   }
   for (const s of SRC.watchlist) { const id = cache.match[keyLb(s)]; if (!id) continue; const e = get(id); e.wl = true; e.lb = s.lb; e.added = s.added || null; }
   for (const s of SRC.watched) { const id = cache.match[keyLb(s)]; if (id) { seen.add(id); seenLb.add(id); } }
+  rated = new Set(SRC.ratings.map(r => cache.match[keyLb(r)]).filter(Boolean));
+  shelfSeenOwn = new Set();
+  for (const s of SRC.shelf) { const id = cache.match[keyShelf(s)]; if (id && s.seen && s.owner !== 'sarah' && !unseen.has(id)) shelfSeenOwn.add(id); }
   for (const id of state.extra) get(id);
   for (const [id, r] of shared) if (r.in_list) get(id);
 }
@@ -354,7 +380,7 @@ async function sync({ force = false } = {}) {
     for (const id of lib.keys()) {
       const f = cache.films[id];
       const hot = !isOwner() || isCandidate(id) || (state.members[id] || []).length || inOurs(id) || state.tray.includes(id);
-      if (force || !f || now - f.ts > (hot ? FRESH_MS : STALE_MS)) want.push(id);
+      if (force || !f || f.ol === undefined || now - f.ts > (hot ? FRESH_MS : STALE_MS)) want.push(id);
     }
     if (want.length) {
       let done = 0; progress('Verfügbarkeit laden', 0, want.length);
@@ -384,8 +410,10 @@ function progress(label, n, total) {
 const svcSet = () => new Set(state.services || []);
 function streamable(f) {
   const s = svcSet(), out = [], names = new Set();
+  const skipPrime = f.id != null && noovActive(f.id);
   for (const p of f.fl || []) {
     if (!s.has(p[0])) continue;
+    if (skipPrime && isPrime(p)) continue;
     const base = p[1].replace(/\s+with ads$/i, '');
     if (names.has(base)) continue;
     names.add(base); out.push(p);
@@ -393,9 +421,13 @@ function streamable(f) {
   return out;
 }
 const allowedTabs = () => isOwner()
-  ? [...state.lists.map(l => l.id), 'all', 'discover', 'hidden']
+  ? [...state.lists.map(l => l.id), 'all', 'discover', 'hidden', 'rate']
   : [OURS, 'discover', 'hidden'];
 
+function addedAt(id) {
+  const sh = shared.get(id), e = lib.get(id);
+  return Math.max(sh?.in_list ? ts(sh.changed_at) : 0, e?.added ? ts(e.added) : 0);
+}
 function visibleIds() {
   const tab = state.tab, q = norm($('#q').value);
   const hidden = new Set(state.hidden);
@@ -423,9 +455,52 @@ function visibleIds() {
     rating: (a, b) => F(b).v - F(a).v,
     title: (a, b) => F(a).t.localeCompare(F(b).t, 'de'),
     new: (a, b) => (F(b).y || 0) - (F(a).y || 0) || F(b).v - F(a).v,
-    short: (a, b) => (F(a).r || 999) - (F(b).r || 999)
+    short: (a, b) => (F(a).r || 999) - (F(b).r || 999),
+    added: (a, b) => addedAt(b) - addedAt(a) || F(b).v - F(a).v
   };
   return out.sort(sorters[state.sort] || sorters.new);
+}
+
+function toRate() {
+  if (!isOwner()) return [];
+  const done = new Set(state.ratedDone || []);
+  const skip = id => rated.has(id) || done.has(id);
+  const app = state.seenLocal.filter(id => !skip(id));
+  const lb = [...seenLb].filter(id => !skip(id) && !app.includes(id));
+  const mm = [...shelfSeenOwn].filter(id => !skip(id) && !seenLb.has(id) && !app.includes(id));
+  return [
+    { key: 'app', title: 'In der App als gesehen markiert', ids: app, open: true },
+    { key: 'lb', title: 'Auf Letterboxd gesehen, aber ohne Bewertung', ids: lb, open: true },
+    { key: 'mm', title: 'Laut MyMovies gesehen, nicht auf Letterboxd', ids: mm, open: false }
+  ].filter(g => g.ids.length);
+}
+const rateCount = () => toRate().reduce((n, g) => n + g.ids.length, 0);
+let rateOpen = {};
+function renderRate() {
+  const groups = toRate();
+  const box = $('#rateView');
+  const missing = groups.flatMap(g => g.ids).filter(id => !cache.films[id]);
+  if (missing.length && state.apiKey) Promise.all(missing.slice(0, 60).map(id => film(id).catch(() => null))).then(() => { if (state.tab === 'rate') render(); });
+  box.replaceChildren(
+    el('p', { class: 'hint' }, 'Filme, die du gesehen, aber auf Letterboxd noch nicht bewertet hast. Mit „Erledigt“ verschwinden sie, beim nächsten Letterboxd-Export räumt sich die Liste zusätzlich selbst auf.'),
+    ...groups.map(g => {
+      const det = el('details', { class: 'rate-group', open: (rateOpen[g.key] ?? g.open) || null, ontoggle: ev => { rateOpen[g.key] = ev.target.open; } },
+        el('summary', {}, `${g.title} `, el('small', {}, String(g.ids.length))),
+        g.ids.length > 3 ? el('button', { class: 'mini', type: 'button', onclick: () => {
+          const prev = (state.ratedDone || []).slice();
+          state.ratedDone = uniq([...prev, ...g.ids]); persist(); render();
+          toast(`${g.ids.length} Filme als erledigt markiert.`, { label: 'Rückgängig', run: () => { state.ratedDone = prev; persist(); render(); } });
+        } }, 'Alle in dieser Gruppe als erledigt markieren') : null,
+        el('ul', { class: 'rate-list' }, g.ids.map(id => {
+          const f = cache.films[id];
+          return el('li', { class: 'sg' },
+            f?.p ? el('img', { src: IMG + 'w92' + f.p, alt: '', loading: 'lazy' }) : el('span', { class: 'sg-noimg' }),
+            el('div', { class: 'sg-body' }, el('strong', {}, f ? f.t + (f.y ? ' (' + f.y + ')' : '') : 'Lade …'),
+              el('span', { class: 'links' }, el('a', { href: lbLink(id), target: '_blank', rel: 'noopener' }, 'Auf Letterboxd bewerten'))),
+            el('button', { class: 'btn ghost', type: 'button', onclick: () => { state.ratedDone = uniq([...(state.ratedDone || []), id]); persist(); render(); } }, 'Erledigt'));
+        })));
+      return det;
+    }));
 }
 
 function renderTabs() {
@@ -450,6 +525,8 @@ function renderTabs() {
     tab('discover', 'Entdecken');
     if (state.hidden.length) tab('hidden', 'Nie', state.hidden.length);
     nav.append(el('button', { class: 'tab add', type: 'button', onclick: () => $('#newListDlg').showModal() }, '+ Liste'));
+    const rc = rateCount();
+    if (rc) tab('rate', 'Nachtragen', rc);
   } else {
     tab(OURS, 'Unsere', countIn(OURS));
     tab('discover', 'Entdecken');
@@ -474,6 +551,20 @@ const extLinks = (id, f) => [
   f.tr ? el('a', { href: 'https://www.youtube.com/watch?v=' + f.tr, target: '_blank', rel: 'noopener' }, 'Trailer') : null,
   el('a', { href: lbLink(id), target: '_blank', rel: 'noopener' }, 'Letterboxd')
 ];
+
+const fmtMonth = iso => { const d = new Date(iso); return isNaN(d) ? '' : String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getFullYear()).slice(2); };
+function ovControl(id, f) {
+  if (f.ol !== 'en') return null;
+  const svc = svcSet();
+  const hasPrime = (f.fl || []).some(p => isPrime(p) && svc.has(p[0]));
+  const r = noov.get(id);
+  if (r?.in_list) return el('span', { class: 'mini muted' }, `Prime ohne O-Ton (${fmtMonth(r.changed_at)}) `,
+    el('button', { class: 'mini', type: 'button', title: 'Prime zählt für diesen Film wieder', onclick: () => setNoov(id, false) }, 'aufheben'));
+  if (!hasPrime) return null;
+  return el('button', { class: 'mini', type: 'button', title: 'Bei Prime gibt es diesen Film nur synchronisiert. Prime zählt dann für diesen Film nicht.', onclick: () => {
+    setNoov(id, true); toast(`„${f.t}“: Prime zählt nicht mehr, bis du es aufhebst.`, { label: 'Rückgängig', run: () => setNoov(id, false) });
+  } }, 'Prime: kein O-Ton');
+}
 
 function card(id) {
   const f = cache.films[id], e = lib.get(id);
@@ -518,7 +609,7 @@ function card(id) {
     ];
   }
   return el('article', { class: 'card', 'data-id': id },
-    el('div', { class: 'poster' },
+    el('div', { class: 'poster', onclick: ev => { if (!ev.target.closest('button')) openFilm(id); } },
       f.p ? el('img', { src: IMG + 'w342' + f.p, alt: '', loading: 'lazy' }) : el('div', { class: 'noimg' }, f.t),
       el('div', { class: 'stickers' }, stickers),
       el('div', { class: 'provs' }, st.map(p => el('img', { src: IMG + 'w92' + p[2], alt: p[1], title: p[1] }))),
@@ -530,7 +621,8 @@ function card(id) {
       el('div', { class: 'meta' }, [f.y, f.r ? f.r + ' min' : null, f.v ? '★ ' + f.v.toFixed(1) : null].filter(Boolean).join(' · ')),
       el('div', { class: 'meta' }, f.g.slice(0, 3).join(', ')),
       src.length ? el('div', { class: 'meta src' }, src.join(' · ')) : null,
-      actions
+      actions,
+      ovControl(id, f)
     )
   );
 }
@@ -543,10 +635,19 @@ function render() {
   renderTabs(); renderNotice();
   const disc = state.tab === 'discover';
   $('#discover').hidden = !disc; $('#main').hidden = disc; document.querySelector('.filters').hidden = disc;
-  if (disc) { $('#filterToggle').hidden = true; $('#suggest').hidden = true; renderTray(); renderDeck(); return; }
+  if (disc) { $('#filterToggle').hidden = true; $('#suggest').hidden = true; $('#rateView').hidden = true; renderTray(); renderDeck(); return; }
+  const rate = state.tab === 'rate';
+  $('#rateView').hidden = !rate;
+  ['#grid', '#count', '#empty', '#tmdbSearch'].forEach(sel => { if (rate) $(sel).hidden = true; });
+  if (rate) {
+    if (!rateCount()) { state.tab = 'mine'; return render(); }
+    $('#filterToggle').hidden = true; $('#suggest').hidden = true; document.querySelector('.filters').hidden = true;
+    $('#count').hidden = true; renderRate(); renderTray(); return;
+  }
+  $('#grid').hidden = false; $('#count').hidden = false;
   renderGenres();
   $('#suggest').hidden = state.tab !== OURS;
-  const collapse = !isOwner();
+  const collapse = !isOwner() || window.matchMedia('(max-width: 700px)').matches;
   const active = (state.source !== 'all' ? 1 : 0) + (state.runtime ? 1 : 0) + state.genres.length + ($('#q').value.trim() ? 1 : 0);
   $('#filterToggle').hidden = !collapse;
   $('#filterToggle').textContent = (filtersOpen ? 'Filter ausblenden' : 'Filter') + (active ? ` (${active} aktiv)` : '');
@@ -655,6 +756,24 @@ async function tmdbSearch() {
   } catch (e) { toast('Suche fehlgeschlagen: ' + e.message); }
 }
 
+/* ---------- Detailansicht ---------- */
+function openFilm(id) {
+  const f = cache.films[id]; if (!f) return;
+  const box = $('#filmBody');
+  box.replaceChildren(
+    f.p ? el('img', { class: 'fd-poster', src: IMG + 'w342' + f.p, alt: '' }) : null,
+    el('div', { class: 'fd-body' },
+      el('h2', {}, f.t),
+      f.o && norm(f.o) !== norm(f.t) ? el('div', { class: 'meta' }, f.o) : null,
+      el('div', { class: 'meta' }, [f.y, f.r ? f.r + ' min' : null, f.v ? '★ ' + f.v.toFixed(1) : null].filter(Boolean).join(' · ')),
+      f.g.length ? el('div', { class: 'meta' }, f.g.join(', ')) : null,
+      el('p', { class: 'fd-ov' }, f.ov || 'Keine Inhaltsangabe vorhanden.'),
+      el('p', { class: 'meta' + (streamable(f).length || lib.get(id)?.shelf ? '' : ' warn') }, whereText(id, f)),
+      el('div', { class: 'links' }, extLinks(id, f)),
+      ovControl(id, f)));
+  $('#filmDlg').showModal();
+}
+
 /* ---------- Vorschlagen per Link oder Titel ---------- */
 async function resolveInput(s) {
   s = s.trim(); let m;
@@ -755,6 +874,7 @@ const feedKey = () => state.feed + '|' + (state.services || []).join(',');
 
 function eligible(id) {
   if (seen.has(id) || state.hidden.includes(id) || inOurs(id)) return false;
+  if (noovActive(id) && cache.films[id] && !streamable(cache.films[id]).length) return false;
   if (isOwner() && lib.has(id)) return false;
   const s = state.snooze[id]; return !(s && s > Date.now());
 }
@@ -904,6 +1024,11 @@ function openSettings() {
     ? 'Alles liegt in der Datenbank und ist auf all deinen Geräten gleich. Ein Backup als Datei schadet trotzdem nicht.'
     : 'Deine Listen, Entscheidungen und Einstellungen liegen nur in diesem Browser. Sichere sie ab und zu als Datei.';
   if (isOwner()) { renderServices(); stats(); }
+  const nl = [...noov].filter(([, r]) => r.in_list);
+  $('#noovBlock').hidden = !nl.length;
+  $('#noovList').replaceChildren(...nl.map(([id, r]) => el('li', {},
+    el('span', {}, (cache.films[id] ? cache.films[id].t : 'Film #' + id) + ` (gemeldet ${fmtMonth(r.changed_at)})`),
+    el('button', { class: 'btn ghost', type: 'button', onclick: ev => { setNoov(id, false); ev.target.closest('li').remove(); } }, 'Aufheben'))));
   $('#settingsDlg').showModal();
 }
 
@@ -936,6 +1061,7 @@ function migrateLocalOurs() {                 // Etappe 1: "ours" aus members in
     state.members[id] = arr.filter(x => x !== OURS);
   }
   shared = new Map(Object.entries(state.sharedLocal).map(([id, r]) => [+id, r]));
+  noov = new Map(Object.entries(state.noovLocal || {}).map(([id, r]) => [+id, r]));
 }
 
 /* ---------- Ansichten: Login, kein Zugang, App ---------- */
@@ -997,6 +1123,7 @@ async function start(session) {
     synced = marksMap();
     syncedPrefs = JSON.stringify(prefsData());
     shared = new Map(sharedRows.filter(r => r.list_id === OURS).map(r => [r.tmdb_id, pickShared(r)]));
+    noov = new Map(sharedRows.filter(r => r.list_id === NOOV).map(r => [r.tmdb_id, pickShared(r)]));
     state.apiKey = house.tmdb_key || '';
     state.services = house.services ?? null;
 
@@ -1219,8 +1346,8 @@ function wire() {
 async function boot() {
   wire();
   try {
-    const [shelf, watchlist, watched] = await Promise.all(['shelf', 'watchlist', 'watched'].map(n => fetch('data/' + n + '.json', { cache: 'no-cache' }).then(r => r.json())));
-    SRC = { shelf: shelf.filter(s => s.imdb), watchlist, watched };
+    const [shelf, watchlist, watched, ratings] = await Promise.all(['shelf', 'watchlist', 'watched', 'ratings'].map(n => fetch('data/' + n + '.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : [])));
+    SRC = { shelf: shelf.filter(s => s.imdb), watchlist, watched, ratings };
   } catch { toast('Datendateien konnten nicht geladen werden.'); }
   if (WANT_CLOUD && !CLOUD) { showView('noAccess', 'Die Anmeldung konnte nicht geladen werden. Prüf deine Internetverbindung und lad die Seite neu.'); return; }
   if (CLOUD) { await bootCloud(); return; }
