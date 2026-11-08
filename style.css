@@ -175,3 +175,5 @@ textarea { width: 100%; resize: vertical; font-size: .85rem; }
 .hint.center { text-align: center; }
 .sticker.sarah { background: var(--panel); color: var(--fg); border: 1px solid var(--line); }
 label.btn { display: inline-block; }
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast-act { background: none; border: 1px solid currentColor; color: inherit; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-weight: 600; white-space: nowrap; }

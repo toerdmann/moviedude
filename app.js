@@ -27,8 +27,9 @@ const state = Object.assign({
   tray: [],                             // Auswahl für heute Abend
   snooze: {},                           // tmdbId -> Zeitpunkt, ab dem er wieder im Feed auftaucht
   feed: 'popular',
-  tab: 'mine', source: 'avail', runtime: 0, sort: 'rating', genres: []
+  tab: 'mine', source: 'avail', runtime: 0, sort: 'new', genres: []
 }, load(STATE_KEY, {}));
+if (!state.sortV) { state.sort = 'new'; state.sortV = 2; }
 const cache = Object.assign({ match: {}, films: {}, providers: null }, load(CACHE_KEY, {}));
 const persist = () => save(STATE_KEY, state);
 let cacheTimer = null;
@@ -48,7 +49,11 @@ const el = (tag, attrs = {}, ...kids) => {
   return n;
 };
 let toastT;
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+function toast(msg, action) {
+  const t = $('#toast'); t.replaceChildren(msg);
+  if (action) t.append(el('button', { class: 'toast-act', type: 'button', onclick: () => { t.hidden = true; action.run(); } }, action.label));
+  t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, action ? 6000 : 3200);
+}
 const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
 /* ---------- TMDB ---------- */
@@ -236,7 +241,7 @@ function visibleIds() {
   const sorters = {
     rating: (a, b) => F(b).v - F(a).v,
     title: (a, b) => F(a).t.localeCompare(F(b).t, 'de'),
-    new: (a, b) => (F(b).y || 0) - (F(a).y || 0),
+    new: (a, b) => (F(b).y || 0) - (F(a).y || 0) || F(b).v - F(a).v,
     short: (a, b) => (F(a).r || 999) - (F(b).r || 999)
   };
   return out.sort(sorters[state.sort] || sorters.rating);
@@ -341,17 +346,20 @@ function toggleList(id, lid) {
 function hide(id) { state.hidden = [...new Set([...state.hidden, id])]; state.tray = state.tray.filter(x => x !== id); persist(); render(); toast('Ausgeblendet. Zu finden im Tab „Nie“.'); }
 function unhide(id) { state.hidden = state.hidden.filter(x => x !== id); persist(); render(); }
 function markSeen(id) {
+  const prev = state.members[id];
   state.seenLocal = [...new Set([...state.seenLocal, id])];
   state.unseenLocal = (state.unseenLocal || []).filter(x => x !== id);
-  if (!state.members[id]) state.members[id] = [];  // fällt aus der Standardliste
+  state.members[id] = [];                      // raus aus allen Listen, auch wenn er manuell drin war
+  state.tray = state.tray.filter(x => x !== id);
   persist(); rebuild(); render();
   window.open(lbLink(id), '_blank', 'noopener');
-  toast('Als gesehen markiert. Hak ihn auf Letterboxd ab, dann bleibt alles synchron.');
+  toast('Gesehen. Raus aus allen Listen. Auf Letterboxd abhaken nicht vergessen.', { label: 'Rückgängig', run: () => unmarkSeen(id, prev) });
 }
-function unmarkSeen(id) {
+function unmarkSeen(id, prevMembers) {
   state.seenLocal = state.seenLocal.filter(x => x !== id);
   if (lib.get(id)?.shelfSeen) state.unseenLocal = [...new Set([...(state.unseenLocal || []), id])];
-  if (state.members[id] && !state.members[id].length) delete state.members[id];
+  if (prevMembers !== undefined) state.members[id] = prevMembers;
+  else if (state.members[id] && !state.members[id].length) delete state.members[id];
   persist(); rebuild(); render();
   toast('Wieder in der Liste.');
 }
