@@ -200,3 +200,4 @@ input[type=email] { background: var(--panel); border: 1px solid var(--line); bor
 .sg-body strong { overflow-wrap: anywhere; }
 .meta.warn { color: var(--hot); }
 @media (max-width: 520px) { .sg { grid-template-columns: 40px minmax(0, 1fr); } .sg .btn { grid-column: 1 / -1; } }
+.toast { width: max-content; max-width: calc(100vw - 32px); }
