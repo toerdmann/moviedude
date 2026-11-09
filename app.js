@@ -1030,6 +1030,8 @@ function openSettings() {
   $('#noovList').replaceChildren(...nl.map(([id, r]) => el('li', {},
     el('span', {}, (cache.films[id] ? cache.films[id].t : 'Film #' + id) + ` (gemeldet ${fmtMonth(r.changed_at)})`),
     el('button', { class: 'btn ghost', type: 'button', onclick: ev => { setNoov(id, false); ev.target.closest('li').remove(); } }, 'Aufheben'))));
+  const v = (document.querySelector('script[src^="app.js"]')?.getAttribute('src') || '').split('v=')[1] || '';
+  $('#appVersion').textContent = v ? `Version ${v.slice(6, 8)}.${v.slice(4, 6)}. ${v.slice(8, 10)}:${v.slice(10, 12)}` : '';
   $('#settingsDlg').showModal();
 }
 
