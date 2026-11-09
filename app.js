@@ -135,8 +135,9 @@ async function details(id) {
     ts: Date.now()
   };
 }
+const isFresh = f => !!f && f.ol !== undefined;   // ältere Cache-Einträge kennen Originalsprache und O-Ton-Trailer noch nicht
 async function film(id) {
-  if (!cache.films[id]) { cache.films[id] = await details(id); persistCache(); }
+  if (!isFresh(cache.films[id])) { cache.films[id] = await details(id); persistCache(); }
   return cache.films[id];
 }
 async function loadProviders() {
@@ -919,14 +920,14 @@ function renderDeck() {
   const top = feed.ids[0];
   if (feed.ids.length < 4) fillFeed();
   if (!top) return msg(feed.loading || !feed.done ? 'Feed wird geladen…' : 'Durch! Für diesen Feed ist nichts Neues mehr da.');
-  if (!cache.films[top]) { msg('Lade Film…'); film(top).then(renderDeck).catch(() => { feed.ids.shift(); renderDeck(); }); return; }
+  if (!isFresh(cache.films[top])) { msg('Lade Film…'); film(top).then(renderDeck).catch(() => { feed.ids.shift(); renderDeck(); }); return; }
   document.querySelectorAll('#discActions .act').forEach(b => { if (b.dataset.act !== 'undo') b.disabled = false; });
   const next = feed.ids[1] && cache.films[feed.ids[1]];
   const kids = [];
   if (next) kids.push(el('div', { class: 'swipe back' }, el('div', { class: 'poster' }, next.p ? el('img', { src: IMG + 'w500' + next.p, alt: '' }) : null)));
   kids.push(swipeCard(top));
   deck.replaceChildren(...kids);
-  feed.ids.slice(1, 4).filter(id => !cache.films[id]).forEach(id => film(id).catch(() => {}));
+  feed.ids.slice(1, 4).filter(id => !isFresh(cache.films[id])).forEach(id => film(id).catch(() => {}));
 }
 function swipeCard(id) {
   const f = cache.films[id];
