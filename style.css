@@ -232,3 +232,7 @@ span.mini button.mini { font-size: inherit; }
 .rate-group summary { cursor: pointer; font: 700 1.15rem var(--f-display); text-transform: uppercase; letter-spacing: .03em; padding: 6px 0; }
 .rate-group summary small { font: 500 .75rem var(--f-mono); color: var(--muted); margin-left: 6px; }
 .rate-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }
+.add-actions { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; max-width: 210px; }
+#addDlg .sg { grid-template-columns: 46px minmax(0, 1fr); }
+#addDlg .add-actions { grid-column: 1 / -1; justify-content: flex-start; max-width: none; }
+#addForm input { flex: 1 1 0; min-width: 0; }

@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=202611081732">
+<link rel="stylesheet" href="style.css?v=202611111829">
 </head>
 <body>
 <header class="top">
@@ -20,6 +20,7 @@
       <span id="syncText">Abgleich…</span>
       <span class="bar"><span id="syncBar"></span></span>
     </div>
+    <button class="btn" id="openAdd" type="button" hidden>+ Film</button>
     <button class="btn ghost" id="openSettings" type="button" aria-label="Einstellungen">Einstellungen</button>
   </div>
 </header>
@@ -134,6 +135,16 @@
   </div>
 </dialog>
 
+<dialog id="addDlg" class="dlg">
+  <div class="dlg-head"><h2>Film hinzufügen</h2><button class="btn ghost" data-close type="button">Fertig</button></div>
+  <form id="addForm" class="inline">
+    <input id="addInput" type="text" autocomplete="off" placeholder="IMDb-Link, Letterboxd-Link oder Titel">
+    <button class="btn" type="submit">Finden</button>
+  </form>
+  <p class="hint" id="addStatus">Gekauft? „+ DVD“ oder „+ Blu-ray“. Nur vormerken? „Auf Meine“.</p>
+  <ul class="suggest-list" id="addList"></ul>
+</dialog>
+
 <dialog id="filmDlg" class="dlg film-dlg">
   <div class="dlg-head"><span></span><button class="btn ghost" data-close type="button">Schließen</button></div>
   <div class="fd" id="filmBody"></div>
@@ -212,6 +223,6 @@
 
 <script src="config.js?v=202611081529"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
-<script src="app.js?v=202611111825"></script>
+<script src="app.js?v=202611111829"></script>
 </body>
 </html>

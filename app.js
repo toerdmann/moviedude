@@ -327,14 +327,21 @@ function rebuild() {
   }
   const unseen = new Set(state.unseenLocal);
   shelfMap = {};
+  const discs = new Map();
+  const addDisc = (id, d) => { if (!discs.has(id)) discs.set(id, new Set()); discs.get(id).add(d); };
   for (const s of SRC.shelf) {
     const id = cache.match[keyShelf(s)]; if (!id) continue;
     const e = get(id);
-    e.shelf = e.shelf && e.shelf !== s.disc ? 'DVD + Blu-ray' : s.disc;
-    shelfMap[id] = e.shelf;
+    addDisc(id, s.disc);
     if (s.owner === 'sarah') e.sarah = true; else e.mineShelf = true;
     if (s.seen && !unseen.has(id)) { e.shelfSeen = true; seen.add(id); }
   }
+  for (const [id, fmts] of Object.entries(house.shelf_extra || {})) {   // per "+ Film" eingetragen
+    if (!fmts || !fmts.length) continue;
+    const e = get(+id); e.mineShelf = true; e.manualShelf = true;
+    fmts.forEach(d => addDisc(+id, d));
+  }
+  for (const [id, set] of discs) { const label = discLabel(set); lib.get(id).shelf = label; shelfMap[id] = label; }
   for (const s of SRC.watchlist) { const id = cache.match[keyLb(s)]; if (!id) continue; const e = get(id); e.wl = true; e.lb = s.lb; e.added = s.added || null; }
   for (const s of SRC.watched) { const id = cache.match[keyLb(s)]; if (id) { seen.add(id); seenLb.add(id); } }
   rated = new Set(SRC.ratings.map(r => cache.match[keyLb(r)]).filter(Boolean));
@@ -344,6 +351,12 @@ function rebuild() {
   for (const [id, r] of shared) if (r.in_list) get(id);
 }
 
+const DISC_FORMATS = ['DVD', 'Blu-ray'];          // später z. B. '4K UHD' ergänzen
+function discLabel(set) {
+  const known = DISC_FORMATS.filter(d => set.has(d));
+  const other = [...set].filter(d => !DISC_FORMATS.includes(d));
+  return [...known, ...other].join(' + ');
+}
 const isCandidate = id => { const e = lib.get(id); return e && !seen.has(id) && (e.wl || e.mineShelf); };
 function privateMembers(id) {
   if (state.members[id]) return state.members[id].filter(x => x !== OURS);
@@ -757,6 +770,59 @@ async function tmdbSearch() {
   } catch (e) { toast('Suche fehlgeschlagen: ' + e.message); }
 }
 
+/* ---------- "+ Film": Film hinzufügen (Meine / Regal) ---------- */
+function ownedFormats(id) { return (house.shelf_extra || {})[id] || []; }
+async function toggleFormat(id, fmt) {
+  const cur = ownedFormats(id);
+  const next = cur.includes(fmt) ? cur.filter(x => x !== fmt) : [...cur, fmt];
+  const all = Object.assign({}, house.shelf_extra || {});
+  if (next.length) all[id] = next; else delete all[id];
+  await pushHouse('shelf_extra', all);
+  rebuild();
+  if (CLOUD) pushHouse('shelf', shelfMap);
+  render(); renderAddResults();
+}
+function addToMine(id) {
+  state.extra = uniq([...state.extra, id]);
+  const cur = privateMembers(id);
+  if (!cur.includes('mine')) state.members[id] = [...cur, 'mine'];
+  persist(); rebuild(); render(); renderAddResults();
+}
+let addIds = [];
+function renderAddResults() {
+  const list = $('#addList'); if (!list) return;
+  list.replaceChildren(...addIds.filter(id => cache.films[id]).map(id => {
+    const f = cache.films[id];
+    const inMine = privateMembers(id).includes('mine');
+    const own = ownedFormats(id);
+    const fromMyMovies = lib.get(id)?.shelf && !own.length;
+    return el('li', { class: 'sg' },
+      f.p ? el('img', { src: IMG + 'w92' + f.p, alt: '' }) : el('span', { class: 'sg-noimg' }),
+      el('div', { class: 'sg-body' },
+        el('strong', {}, f.t + (f.y ? ' (' + f.y + ')' : '')),
+        el('span', { class: 'meta' }, whereText(id, f) + (seen.has(id) ? ' · schon gesehen' : '')),
+        el('span', { class: 'links' }, extLinks(id, f))),
+      el('div', { class: 'add-actions' },
+        el('button', { class: 'lchip' + (inMine ? ' on' : ''), type: 'button', onclick: () => inMine ? toggleList(id, 'mine') || renderAddResults() : addToMine(id) }, inMine ? 'In Meine' : 'Auf Meine'),
+        ...DISC_FORMATS.map(fmt => el('button', { class: 'lchip' + (own.includes(fmt) ? ' on' : ''), type: 'button', title: own.includes(fmt) ? 'Wieder aus dem Regal nehmen' : 'Ins Regal stellen', onclick: () => toggleFormat(id, fmt) }, (own.includes(fmt) ? '✓ ' : '+ ') + fmt)),
+        fromMyMovies ? el('span', { class: 'meta' }, 'steht laut MyMovies schon im Regal') : null));
+  }));
+}
+async function addSearch(e) {
+  e.preventDefault();
+  const input = $('#addInput').value; if (!input.trim()) return;
+  const status = $('#addStatus');
+  if (!state.apiKey) { status.textContent = 'Erst den TMDB-Schlüssel eintragen.'; return; }
+  status.textContent = 'Suche…'; addIds = []; renderAddResults();
+  try {
+    const ids = await resolveInput(input);
+    await Promise.all(ids.map(id => film(id).catch(() => null)));
+    addIds = ids.filter(id => cache.films[id]);
+    status.textContent = addIds.length ? (addIds.length === 1 ? 'Gefunden:' : 'Welcher ist es?') : 'Nichts gefunden. Probier den Originaltitel oder einen IMDb-Link.';
+    renderAddResults();
+  } catch (err) { status.textContent = err.message || String(err); }
+}
+
 /* ---------- Detailansicht ---------- */
 function openFilm(id) {
   const f = cache.films[id]; if (!f) return;
@@ -1073,6 +1139,7 @@ function showView(v, msg) {
   $('#noAccess').hidden = v !== 'noAccess';
   $('#app').hidden = v !== 'app';
   $('#openSettings').hidden = v !== 'app';
+  $('#openAdd').hidden = v !== 'app' || !isOwner();
   appShown = v === 'app';
   if (v === 'login' && msg) $('#loginStatus').textContent = msg;
   if (v === 'noAccess' && msg) $('#noAccessText').textContent = msg;
@@ -1302,6 +1369,8 @@ function wire() {
     if (!error) $('#newPassword').value = '';
   });
   $('#suggestForm').addEventListener('submit', suggest);
+  $('#addForm').addEventListener('submit', addSearch);
+  $('#openAdd').addEventListener('click', () => { $('#addDlg').showModal(); $('#addInput').focus(); });
   $('#filterToggle').addEventListener('click', () => { filtersOpen = !filtersOpen; render(); });
   $('#noticeShow').addEventListener('click', openNotice);
   $('#noticeOk').addEventListener('click', ackNotice);
