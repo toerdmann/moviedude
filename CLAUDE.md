@@ -1,5 +1,7 @@
 # MovieDude – Projektnotizen für Claude
 
+Details zu Aufbau und Änderungen: `docs/ARCHITEKTUR.md`.
+
 Private Filmauswahl-App von Tobias („Dude“) und seiner Frau Sarah. Sprache im Umgang: Deutsch, locker, kurz.
 Live: https://toerdmann.github.io/moviedude/ (GitHub Pages, Branch `main`, Root).
 
