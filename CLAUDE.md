@@ -15,7 +15,7 @@ Live: https://toerdmann.github.io/moviedude/ (GitHub Pages, Branch `main`, Root)
   - `marks`: persönliche Markierungen pro Film (hidden, seen, unseen, extra, snooze, lists).
   - `prefs`: lists, tray, lastSeen, ratedDone.
   - `shared_items`: `list_id='ours'` = gemeinsame Liste „Unsere“; `list_id='noov'` = Prime ohne englischen O-Ton (mit Datum).
-- Ohne Supabase-Config läuft die App im alten Browser-only-Modus (Etappe 1).
+- Ohne Supabase-Config zeigt die App nur einen Hinweis (der alte Browser-only-Modus aus Etappe 1 ist entfernt).
 
 ## Daten aktualisieren
 - Letterboxd: Tobias schickt den ZIP-Export → `python3 -I scripts/import_letterboxd.py <zip>` (schreibt watchlist/watched/ratings.json und listet, was neu ist). Keine Schreib-API zu Letterboxd, kein Scraping.
@@ -25,7 +25,7 @@ Live: https://toerdmann.github.io/moviedude/ (GitHub Pages, Branch `main`, Root)
 ## Regeln
 - Vor jedem Push: `bash tests/run.sh` (Browser-Test + Datenbank-Regeln). Neue Features bekommen Checks in `tests/e2e.cjs`.
 - Commits immer als `toerdmann <340679489+toerdmann@users.noreply.github.com>`, nie mit Gmail-Adresse.
-- Nach Änderungen an `app.js`/`style.css` die `?v=`-Parameter in `index.html` hochzählen (Cache).
+- Cache-Version (`?v=` in `index.html`) setzt `tests/run.sh` automatisch über `scripts/bump.sh`, sobald App-Dateien geändert sind.
 - Größere Features erst als Konzept besprechen, dann bauen.
 - Verfügbarkeit: „Heute verfügbar“ = eigenes Regal oder aktiver Dienst; Prime zählt nicht bei englischem Original ohne O-Ton (noov).
 - Trailer: bei englischem Original englisch, sonst deutsch.

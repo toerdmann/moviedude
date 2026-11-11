@@ -15,6 +15,8 @@ if [ ! -f "$CACHE/supabase-js/package/dist/umd/supabase.js" ] || [ "$(cat "$CACH
 fi
 
 node --check app.js
+# Geänderte App-Dateien? Dann Cache-Version in index.html hochsetzen.
+if ! git diff --quiet HEAD -- app.js style.css config.js 2>/dev/null; then bash scripts/bump.sh; fi
 echo "### Browser-Test"
 node tests/e2e.cjs
 if ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1; then

@@ -1,13 +1,13 @@
 /* MovieDude — Watchlist, Regal und Streaming-Verfügbarkeit.
-   Etappe 2: Login per Mail-Link, Daten in Supabase, gemeinsame Liste "Unsere" mit Sarah.
-   Ohne Supabase-Zugangsdaten (config.js leer) läuft die App wie in Etappe 1 nur im Browser. */
+   Login per Mail-Link oder Passwort, Daten in Supabase, gemeinsame Liste "Unsere" mit Sarah.
+   Aufbau und Änderungsleitfaden: docs/ARCHITEKTUR.md */
 (() => {
 'use strict';
 
 const API = 'https://api.themoviedb.org/3';
 const IMG = 'https://image.tmdb.org/t/p/';
 const REGION = 'DE';
-const STATE_KEY = 'md.state.v1';          // Etappe 1: kompletter Zustand im Browser
+const STATE_KEY = 'md.state.v1';          // alter Browser-Zustand (Etappe 1), nur noch zum Übernehmen gelesen
 const UI_KEY = 'md.ui.v1';                // Etappe 2: Ansichts-Einstellungen pro Gerät
 const CACHE_KEY = 'md.cache.v1';
 const FRESH_MS = 2 * 24 * 3600 * 1000;
@@ -17,8 +17,7 @@ const DEFAULT_SERVICES = [/netflix/i, /amazon prime video/i, /^apple tv\+?$/i, /
 const OURS = 'ours';
 
 const CFG = window.MD_CONFIG || {};
-const WANT_CLOUD = !!(CFG.supabaseUrl && CFG.supabaseKey);
-const CLOUD = WANT_CLOUD && !!window.supabase;
+const CONFIGURED = !!(CFG.supabaseUrl && CFG.supabaseKey);
 
 /* ---------- Speicher ---------- */
 const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
@@ -33,8 +32,6 @@ const freshState = () => ({
   members: {},                          // tmdbId -> [private listIds]  (fehlt = Standard)
   hidden: [], seenLocal: [], unseenLocal: [], extra: [], tray: [],
   snooze: {},
-  sharedLocal: {},                      // nur Etappe 1: "Unsere" im Browser
-  noovLocal: {},                        // nur Etappe 1: Prime ohne O-Ton
   ratedDone: [],                        // "Nachtragen": als erledigt abgehakt
   lastSeen: 0,
   feed: 'popular', tab: 'mine', source: 'avail', runtime: 0, sort: 'new', genres: [], sortV: 2
@@ -165,7 +162,6 @@ const noovActive = id => !!noov.get(id)?.in_list;
 async function setNoov(id, on) {
   const prev = noov.get(id);
   noov.set(id, { in_list: on, changed_by: me.id, changed_at: new Date().toISOString() });
-  if (!CLOUD) { state.noovLocal[id] = noov.get(id); persist(); rebuild(); render(); return; }
   rebuild(); render();
   const { data, error } = await sb.from('shared_items').upsert({ list_id: NOOV, tmdb_id: id, in_list: on }, { onConflict: 'list_id,tmdb_id' }).select().single();
   if (error) { if (prev) noov.set(id, prev); else noov.delete(id); toast('Speichern fehlgeschlagen: ' + error.message); rebuild(); render(); return; }
@@ -182,9 +178,6 @@ async function setOurs(id, on) {
   if (!!prev?.in_list === on) return;
   const row = { in_list: on, added_by: on ? me.id : (prev?.added_by ?? null), changed_by: me.id, changed_at: prev?.changed_at || '' };
   shared.set(id, row);
-  if (!CLOUD) {
-    state.sharedLocal[id] = row; persist(); return;
-  }
   pendingShared.set(id, (pendingShared.get(id) || 0) + 1);
   try {
     const { data, error } = await sb.from('shared_items')
@@ -242,7 +235,7 @@ function marksToState(rows) {
 let synced = new Map();
 let pushing = false, pushAgain = false, retryT = null;
 async function pushMarks() {
-  if (!CLOUD || !me.id) return;
+  if (!me.id) return;
   if (pushing) { pushAgain = true; return; }
   pushing = true;
   try {
@@ -283,7 +276,7 @@ function applyRemoteMark(row, deleted) {
 let syncedPrefs = '';
 const prefsData = () => Object.fromEntries(SYNC_PREF_FIELDS.map(k => [k, state[k]]));
 async function pushPrefs() {
-  if (!CLOUD || !me.id) return;
+  if (!me.id) return;
   const data = prefsData(); const json = JSON.stringify(data);
   if (json === syncedPrefs) return;
   const { error } = await sb.from('prefs').upsert({ user_id: me.id, data }, { onConflict: 'user_id' });
@@ -292,7 +285,7 @@ async function pushPrefs() {
 }
 async function pushHouse(key, val) {
   house[key] = val;
-  if (!CLOUD || !isOwner()) return;
+  if (!isOwner()) return;
   const { error } = await sb.from('household').upsert({ key, val }, { onConflict: 'key' });
   if (error) toast('Speichern fehlgeschlagen: ' + error.message);
 }
@@ -300,7 +293,6 @@ async function pushHouse(key, val) {
 let persistT = null;
 function persist() {
   save(UI_KEY, Object.fromEntries(UI_FIELDS.map(k => [k, state[k]])));
-  if (!CLOUD) { save(STATE_KEY, state); return; }
   clearTimeout(persistT);
   persistT = setTimeout(() => { pushMarks(); pushPrefs(); }, 250);
 }
@@ -409,7 +401,7 @@ async function sync({ force = false } = {}) {
         .finally(() => { progress('Verfügbarkeit laden', ++done, want.length); if (done % 40 === 0) { persistCache(); render(); } })));
       persistCache();
     }
-    if (CLOUD && isOwner()) {
+    if (isOwner()) {
       if (JSON.stringify(shelfMap) !== JSON.stringify(house.shelf || {})) pushHouse('shelf', shelfMap);
       const m = Object.fromEntries(Object.entries(cache.match).filter(([, v]) => v));
       if (JSON.stringify(m) !== JSON.stringify(house.match || {})) pushHouse('match', m);
@@ -786,7 +778,7 @@ async function toggleFormat(id, fmt) {
   if (next.length) all[id] = next; else delete all[id];
   await pushHouse('shelf_extra', all);
   rebuild();
-  if (CLOUD) pushHouse('shelf', shelfMap);
+  pushHouse('shelf', shelfMap);
   render(); renderAddResults();
 }
 function addToMine(id) {
@@ -904,7 +896,7 @@ async function suggest(e) {
 
 /* ---------- Hinweise: Was hat die andere Person in "Unsere" geändert? ---------- */
 function foreignChanges() {
-  if (!CLOUD || !me.id) return [];
+  if (!me.id) return [];
   const out = [];
   for (const [id, r] of shared) if (r.changed_by && r.changed_by !== me.id && ts(r.changed_at) > (state.lastSeen || 0)) out.push([id, r]);
   return out.sort((a, b) => ts(b[1].changed_at) - ts(a[1].changed_at));
@@ -1076,7 +1068,7 @@ async function renderServices() {
 }
 function setServices(ids) {
   state.services = ids;
-  if (CLOUD) pushHouse('services', ids); else persist();
+  pushHouse('services', ids);
 }
 function stats() {
   if (!isOwner()) { $('#stats').textContent = ''; return; }
@@ -1087,16 +1079,12 @@ function stats() {
 }
 function openSettings() {
   $('#apiKey').value = state.apiKey;
-  $('#account').hidden = !CLOUD;
-  if (CLOUD) $('#accountText').textContent = `Angemeldet als ${me.name} (${me.email}).`;
+  $('#accountText').textContent = `Angemeldet als ${me.name} (${me.email}).`;
   $('#keyBlock').hidden = !isOwner();
   $('#svcBlock').hidden = !isOwner();
   $('#dataBlock').hidden = !isOwner();
   const local = load(STATE_KEY, null);
-  $('#mergeLocal').hidden = !(CLOUD && isOwner() && local && hasContent(local));
-  $('#backupHint').textContent = CLOUD
-    ? 'Alles liegt in der Datenbank und ist auf all deinen Geräten gleich. Ein Backup als Datei schadet trotzdem nicht.'
-    : 'Deine Listen, Entscheidungen und Einstellungen liegen nur in diesem Browser. Sichere sie ab und zu als Datei.';
+  $('#mergeLocal').hidden = !(isOwner() && local && hasContent(local));
   if (isOwner()) { renderServices(); stats(); }
   const nl = [...noov].filter(([, r]) => r.in_list);
   $('#noovBlock').hidden = !nl.length;
@@ -1129,15 +1117,6 @@ function mergeState(src, { takeUi = false } = {}) {
   for (const id of ours) if (!inOurs(id)) setOurs(id, true);
   rebuild(); render();
   return ours.length;
-}
-function migrateLocalOurs() {                 // Etappe 1: "ours" aus members in sharedLocal verschieben
-  for (const [id, arr] of Object.entries(state.members)) {
-    if (!(arr || []).includes(OURS)) continue;
-    state.sharedLocal[id] = { in_list: true, added_by: null, changed_by: null, changed_at: '' };
-    state.members[id] = arr.filter(x => x !== OURS);
-  }
-  shared = new Map(Object.entries(state.sharedLocal).map(([id, r]) => [+id, r]));
-  noov = new Map(Object.entries(state.noovLocal || {}).map(([id, r]) => [+id, r]));
 }
 
 /* ---------- Ansichten: Login, kein Zugang, App ---------- */
@@ -1197,7 +1176,7 @@ async function start(session) {
     for (const k of SYNC_PREF_FIELDS) if (pd[k] !== undefined) state[k] = pd[k];
     if (!state.lists.some(l => l.id === OURS)) state.lists.splice(1, 0, { id: OURS, name: 'Unsere' });
     marksToState(marks);
-    synced = marksMap();
+    synced = new Map(marks.map(r => [r.tmdb_id + '|' + r.kind, JSON.stringify(r.val)]));   // inkl. abgelaufener Einträge -> werden beim nächsten Speichern gelöscht
     syncedPrefs = JSON.stringify(prefsData());
     shared = new Map(sharedRows.filter(r => r.list_id === OURS).map(r => [r.tmdb_id, pickShared(r)]));
     noov = new Map(sharedRows.filter(r => r.list_id === NOOV).map(r => [r.tmdb_id, pickShared(r)]));
@@ -1219,6 +1198,7 @@ async function start(session) {
       }
     }
     subscribe();
+    pushMarks();                                 // räumt Datenleichen (z. B. abgelaufenes "Lass erstmal") auf
     showView('app'); rebuild(); render();
     if (state.apiKey) { if (isOwner() && state.services == null) await renderServices(); sync(); }
     else if (isOwner()) openSettings();
@@ -1305,7 +1285,7 @@ function wire() {
     try {
       if (!(await checkKey(k))) { $('#keyStatus').textContent = 'TMDB lehnt den Schlüssel ab. Nimm den kurzen „API-Schlüssel“, nicht das lange Token.'; return; }
       state.apiKey = k;
-      if (CLOUD) await pushHouse('tmdb_key', k); else persist();
+      await pushHouse('tmdb_key', k);
       $('#keyStatus').textContent = 'Passt. Abgleich startet.';
       renderServices(); sync();
     } catch (e) { $('#keyStatus').textContent = 'TMDB nicht erreichbar: ' + e.message; }
@@ -1324,17 +1304,9 @@ function wire() {
     try {
       const data = JSON.parse(await file.text());
       if (data.app !== 'moviedude' || !data.state) throw new Error('Das ist kein MovieDude-Backup.');
-      if (CLOUD) {
-        if (!window.confirm(`Backup vom ${(data.exportedAt || '').slice(0, 10)} mit deinen jetzigen Daten zusammenführen?`)) return;
-        const n = mergeState(data.state);
-        $('#backupStatus').textContent = `Backup zusammengeführt${n ? `, ${n} Filme in Unsere` : ''}.`;
-      } else {
-        if (!window.confirm(`Backup vom ${(data.exportedAt || '').slice(0, 10)} einspielen? Deine aktuellen Listen und Entscheidungen in diesem Browser werden ersetzt.`)) return;
-        const key = state.apiKey;
-        Object.assign(state, freshState(), data.state, { apiKey: key });
-        migrateLocalOurs(); persist(); rebuild(); render();
-        $('#backupStatus').textContent = 'Backup eingespielt.';
-      }
+      if (!window.confirm(`Backup vom ${(data.exportedAt || '').slice(0, 10)} mit deinen jetzigen Daten zusammenführen?`)) return;
+      const n = mergeState(data.state);
+      $('#backupStatus').textContent = `Backup zusammengeführt${n ? `, ${n} Filme in Unsere` : ''}.`;
       sync();
     } catch (err) { $('#backupStatus').textContent = 'Einspielen fehlgeschlagen: ' + err.message; }
   });
@@ -1429,14 +1401,9 @@ async function boot() {
     const [shelf, watchlist, watched, ratings] = await Promise.all(['shelf', 'watchlist', 'watched', 'ratings'].map(n => fetch('data/' + n + '.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : [])));
     SRC = { shelf: shelf.filter(s => s.imdb), watchlist, watched, ratings };
   } catch { toast('Datendateien konnten nicht geladen werden.'); }
-  if (WANT_CLOUD && !CLOUD) { showView('noAccess', 'Die Anmeldung konnte nicht geladen werden. Prüf deine Internetverbindung und lad die Seite neu.'); return; }
-  if (CLOUD) { await bootCloud(); return; }
-  Object.assign(state, load(STATE_KEY, {}));
-  migrateLocalOurs();
-  if (!state.lists.some(l => l.id === OURS)) state.lists.splice(1, 0, { id: OURS, name: 'Unsere' });
-  showView('app'); rebuild(); render();
-  if (!state.apiKey) openSettings();
-  else { if (state.services == null) await renderServices(); sync(); }
+  if (!CONFIGURED) { showView('noAccess', 'In config.js fehlen die Supabase-Zugangsdaten.'); return; }
+  if (!window.supabase) { showView('noAccess', 'Die Anmeldung konnte nicht geladen werden. Prüf deine Internetverbindung und lad die Seite neu.'); return; }
+  await bootCloud();
 }
 // Nur für die automatischen Tests (tests/e2e.cjs öffnet die Seite mit ?mdtest)
 if (/[?&]mdtest\b/.test(location.search)) window.__mdTest = { matchByTitle, norm, discLabel };

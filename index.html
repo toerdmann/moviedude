@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=202611111829">
+<link rel="stylesheet" href="style.css?v=202611112345">
 </head>
 <body>
 <header class="top">
@@ -157,7 +157,7 @@
 
 <dialog id="settingsDlg" class="dlg">
   <div class="dlg-head"><h2>Einstellungen</h2><button class="btn ghost" data-close type="button">Schließen</button></div>
-  <div id="account" hidden>
+  <div id="account">
     <p class="hint" id="accountText"></p>
     <button class="btn ghost" id="logoutBtn" type="button">Abmelden</button>
     <h3>Passwort</h3>
@@ -195,7 +195,7 @@
     </div>
     <p class="hint" id="mergeStatus"></p>
     <h3>Backup</h3>
-    <p class="hint" id="backupHint">Deine Listen, Entscheidungen und Einstellungen liegen nur in diesem Browser. Sichere sie ab und zu als Datei.</p>
+    <p class="hint" id="backupHint">Alles liegt in der Datenbank und ist auf all deinen Geräten gleich. Ein Backup als Datei schadet trotzdem nicht.</p>
     <div class="dlg-actions">
       <button class="btn" id="exportBtn" type="button">Backup herunterladen</button>
       <label class="btn ghost" for="importFile">Backup einspielen</label>
@@ -221,8 +221,8 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="config.js?v=202611081529"></script>
+<script src="config.js?v=202611112345"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
-<script src="app.js?v=202611112330"></script>
+<script src="app.js?v=202611112345"></script>
 </body>
 </html>

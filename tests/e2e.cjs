@@ -209,7 +209,7 @@ const tabText = async (page, name) => { const t = page.locator(`#tabs .tab:has-t
 
   console.log('\n== Hilfsfunktionen ==');
   {
-    const d = await device(browser, { cloud: false, local: { apiKey: 'goodkey', services: [9] } });
+    const d = await device(browser, {});
     await d.page.waitForFunction(() => window.__mdTest);
     const r = await d.page.evaluate(async () => {
       const t = window.__mdTest;
@@ -288,11 +288,13 @@ const tabText = async (page, name) => { const t = page.locator(`#tabs .tab:has-t
 
   console.log('\n== Tobias Handy: frisches Gerät ==');
   const before = tmdbCalls;
+  db.marks.push({ user_id: T.sub, tmdb_id: 888, kind: 'snooze', val: Date.now() - 1000 });   // abgelaufenes "Lass erstmal"
   const t2 = await device(browser, { user: T, viewport: { width: 390, height: 844 } });
   await t2.page.waitForSelector('#app:not([hidden])', { timeout: 15000 });
   await idle(t2.page);
   {
     check(await t2.page.locator('#settingsDlg[open]').count() === 0, 'Kein Schlüssel-Dialog');
+    check(!db.marks.some(m => m.tmdb_id === 888), 'Abgelaufenes "Lass erstmal" wird aus der Datenbank geräumt');
     check(tmdbCalls - before < 1500, 'Zuordnungen aus dem Haushalt übernommen statt neu gesucht (' + (tmdbCalls - before) + ' TMDB-Aufrufe)');
     check(await t2.page.locator('.filters').isHidden() && await t2.page.locator('#filterToggle').isVisible(), 'Filter am Handy eingeklappt');
     await t2.page.click('#filterToggle');
@@ -390,6 +392,7 @@ const tabText = async (page, name) => { const t = page.locator(`#tabs .tab:has-t
     await P.locator('#services .svc:has-text("Netflix") input').check(); await sleep(600);
     check(JSON.stringify(db.household.find(r => r.key === 'services').val) === '[9,2100,350,8]', 'Netflix im Haushalt aktiviert');
     check(/Version/.test(await P.textContent('#appVersion')), 'Versionsanzeige in den Einstellungen');
+    check(await P.locator('#account').isVisible() && /Tobias/.test(await P.textContent('#accountText')), 'Konto-Bereich sichtbar');
     await P.click('#settingsDlg [data-close]');
     await foreground(s.page);
     await s.page.click('#tabs .tab:has-text("Unsere")');
@@ -440,12 +443,11 @@ const tabText = async (page, name) => { const t = page.locator(`#tabs .tab:has-t
     check(t1.errors.length === 0 && t2.errors.length === 0 && s.errors.length === 0, 'keine JS-Fehler ' + [...t1.errors, ...t2.errors, ...s.errors].join(' | '));
   }
 
-  console.log('\n== Browser-only-Modus (ohne Supabase) ==');
+  console.log('\n== Ohne Supabase-Zugangsdaten ==');
   {
-    const d = await device(browser, { cloud: false, local: { apiKey: 'goodkey', services: [9], members: { '118715': ['ours'] }, hidden: [], seenLocal: [], extra: [], tray: [] } });
-    await d.page.waitForSelector('#app:not([hidden])'); await idle(d.page);
-    await d.page.click('#tabs .tab:has-text("Unsere")'); await d.page.click('#source button[data-v="all"]');
-    check(await d.page.locator('#grid .card').count() === 1 && await d.page.locator('#login').isHidden(), 'Läuft ohne Login, Unsere aus altem Zustand');
+    const d = await device(browser, { cloud: false });
+    await d.page.waitForSelector('#noAccess:not([hidden])', { timeout: 10000 });
+    check(/config\.js/.test(await d.page.textContent('#noAccessText')) && await d.page.locator('#app').isHidden(), 'Klare Meldung statt halber App');
     check(d.errors.length === 0, 'keine JS-Fehler ' + d.errors.join(' | '));
     await d.ctx.close();
   }

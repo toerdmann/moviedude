@@ -8,7 +8,7 @@ Kurzfassung für alle, die (auch in neuen Chats) an der App arbeiten. Ergänzt `
 | `index.html` | Gesamtes Markup inkl. aller Dialoge. Lädt `config.js`, supabase-js (jsDelivr, gepinnt), `app.js` – alle mit `?v=`-Cache-Parameter. |
 | `style.css` | Design-Tokens oben (`:root`, Dark Mode), danach Bausteine; neuere Abschnitte sind unten angehängt. |
 | `app.js` | Die komplette Logik in einer IIFE, Abschnitte mit `/* ---------- Name ---------- */` getrennt. |
-| `config.js` | Supabase-URL + publishable key. Leer = Browser-only-Modus (Etappe 1). |
+| `config.js` | Supabase-URL + publishable key. Leer = App zeigt nur einen Hinweis. |
 | `data/*.json` | Exporte: `shelf` (MyMovies), `watchlist`, `watched`, `ratings` (Letterboxd). |
 | `supabase/schema.sql` | Idempotentes Schema inkl. RLS. Mail-Platzhalter `__TOBIAS_EMAIL__`, `__SARAH_EMAIL__`. |
 | `scripts/import_*.py` | Exporte von Letterboxd (ZIP) und MyMovies (CSV) in `data/*.json` umwandeln. |
@@ -25,7 +25,8 @@ Konstanten/State → Helfer (`el`, `toast`, `norm`) → TMDB (Warteschlange, `ma
 5. **Gemeinsames** (`shared_items`): `setOurs`/`setNoov` schreiben sofort, optimistisch, mit Rücknahme bei Fehler. `changed_by/changed_at` setzt ein DB-Trigger.
 6. **Haushalt** (`household`, nur Tobias schreibt): `tmdb_key`, `services`, `shelf` (für Sarah), `match`, `shelf_extra`. Letzter Schreiber gewinnt.
 7. **Prefs** (`prefs`): `lists`, `tray`, `lastSeen`, `ratedDone` als ein JSON-Blob – letzter Schreiber gewinnt.
-8. **Pro Gerät** (localStorage): `md.ui.v1` (Tab, Filter, Sortierung), `md.cache.v1` (TMDB-Cache). `md.state.v1` nur Etappe 1 / Migration.
+8. **Pro Gerät** (localStorage): `md.ui.v1` (Tab, Filter, Sortierung), `md.cache.v1` (TMDB-Cache). `md.state.v1` = alter Etappe-1-Zustand, wird nur noch gelesen (einmalige Übernahme, Knopf „Daten aus diesem Browser übernehmen“).
+9. **Aufräumen**: Beim Start gilt der Datenbank-Stand als `synced`; was lokal nicht mehr existiert (z. B. abgelaufenes „Lass erstmal“), löscht der erste `pushMarks()`.
 
 ## Rollen
 `me.role` = `owner` (Tobias) oder `partner` (Sarah). Partner: nur Tabs Unsere/Entdecken/Nie, `lib` nur aus `shared` + `extra`, Regal-Info aus `house.shelf`, keine Einstellungen außer Konto/Passwort. Rechte erzwingt die Datenbank (RLS), die UI blendet nur aus.
@@ -41,7 +42,7 @@ Konstanten/State → Helfer (`el`, `toast`, `norm`) → TMDB (Warteschlange, `ma
 - **Schema-Änderung**: SQL idempotent formulieren, an `schema.sql` anhängen und Tobias den Block zum Ausführen im Supabase SQL Editor geben (Claude hat keinen Zugriff auf Supabase).
 
 ## Stolperfallen
-- Nach Änderungen an `app.js`/`style.css` den `?v=` in `index.html` erhöhen. GitHub Pages cacht HTML bis ~10 Min.
+- `?v=` in `index.html` setzt `scripts/bump.sh` (läuft automatisch in `tests/run.sh`). GitHub Pages cacht HTML trotzdem bis ~10 Min.
 - Supabase-Mailversand: max. 2 Mails/Stunde → Passwort-Login als Ausweg.
 - Deployment kann bei GitHub-Störungen mit `startup_failure` scheitern → `gh api repos/toerdmann/moviedude/actions/runs` prüfen, ggf. leerer Commit.
 - Aus der Sandbox sind TMDB, Supabase und github.io nicht erreichbar; getestet wird mit `bash tests/run.sh`. Der Mock in `tests/e2e.cjs` bildet die Zugriffsregeln nur vereinfacht nach – Änderungen an `schema.sql` zusätzlich in `tests/rls.sql` prüfen.
