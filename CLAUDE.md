@@ -18,11 +18,12 @@ Live: https://toerdmann.github.io/moviedude/ (GitHub Pages, Branch `main`, Root)
 - Ohne Supabase-Config läuft die App im alten Browser-only-Modus (Etappe 1).
 
 ## Daten aktualisieren
-- Letterboxd: Tobias schickt den ZIP-Export → `data/watchlist.json` (title, year, lb, added), `data/watched.json`, `data/ratings.json` (lb, r) neu erzeugen. Keine Schreib-API zu Letterboxd, kein Scraping.
-- MyMovies: `Collection.csv` → `data/shelf.json` (nur Filme/Dokus mit IMDb-ID; Sarahs Filme = Sammlungsnummer 713–745 plus Johnny English → `owner: 'sarah'`, zählen nicht als gesehen).
+- Letterboxd: Tobias schickt den ZIP-Export → `python3 -I scripts/import_letterboxd.py <zip>` (schreibt watchlist/watched/ratings.json und listet, was neu ist). Keine Schreib-API zu Letterboxd, kein Scraping.
+- MyMovies: `python3 -I scripts/import_mymovies.py <Collection.csv>` → `data/shelf.json`. Regeln (Sarahs Filme usw.) stehen oben im Skript.
 - Einzelne gekaufte Filme trägt Tobias selbst über „+ Film“ ein.
 
 ## Regeln
+- Vor jedem Push: `bash tests/run.sh` (Browser-Test + Datenbank-Regeln). Neue Features bekommen Checks in `tests/e2e.cjs`.
 - Commits immer als `toerdmann <340679489+toerdmann@users.noreply.github.com>`, nie mit Gmail-Adresse.
 - Nach Änderungen an `app.js`/`style.css` die `?v=`-Parameter in `index.html` hochzählen (Cache).
 - Größere Features erst als Konzept besprechen, dann bauen.

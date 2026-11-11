@@ -70,7 +70,7 @@ function toast(msg, action) {
   if (action) t.append(el('button', { class: 'toast-act', type: 'button', onclick: () => { t.hidden = true; action.run(); } }, action.label));
   t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, action ? 6000 : 3500);
 }
-const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const uniq = a => [...new Set(a)];
 const chunks = (a, n) => { const o = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; };
 const ts = s => (s ? Date.parse(s) || 0 : 0);
@@ -1438,5 +1438,7 @@ async function boot() {
   if (!state.apiKey) openSettings();
   else { if (state.services == null) await renderServices(); sync(); }
 }
+// Nur für die automatischen Tests (tests/e2e.cjs öffnet die Seite mit ?mdtest)
+if (/[?&]mdtest\b/.test(location.search)) window.__mdTest = { matchByTitle, norm, discLabel };
 boot();
 })();

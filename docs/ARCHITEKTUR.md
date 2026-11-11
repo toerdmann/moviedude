@@ -11,6 +11,8 @@ Kurzfassung für alle, die (auch in neuen Chats) an der App arbeiten. Ergänzt `
 | `config.js` | Supabase-URL + publishable key. Leer = Browser-only-Modus (Etappe 1). |
 | `data/*.json` | Exporte: `shelf` (MyMovies), `watchlist`, `watched`, `ratings` (Letterboxd). |
 | `supabase/schema.sql` | Idempotentes Schema inkl. RLS. Mail-Platzhalter `__TOBIAS_EMAIL__`, `__SARAH_EMAIL__`. |
+| `scripts/import_*.py` | Exporte von Letterboxd (ZIP) und MyMovies (CSV) in `data/*.json` umwandeln. |
+| `tests/run.sh` | Alle Tests: `e2e.cjs` (Playwright, Supabase/TMDB nachgebaut, beide Rollen) und `rls.sh`/`rls.sql` (Schema + Zugriffsregeln gegen lokales Postgres). |
 
 ## Abschnitte in app.js (Reihenfolge)
 Konstanten/State → Helfer (`el`, `toast`, `norm`) → TMDB (Warteschlange, `matchByImdb`, `matchByTitle`, `details`, `film`) → Prime ohne O-Ton (`noov`) → „Unsere“ (`shared`, `setOurs`) → Persönliche Markierungen (`marksMap`, `pushMarks`) → Prefs/Haushalt → Quelldaten + `rebuild()` → `sync()` → Ansicht (`visibleIds`, `card`, `render`) → Aktionen → Heute Abend → „+ Film“ → Detailansicht → Vorschlagen → Hinweise → Entdecken → Einstellungen → Übernahme aus Etappe 1 → Ansichten → Supabase (`start`, `subscribe`, `refresh`) → Sprüche → `wire()` → `boot()`.
@@ -42,5 +44,7 @@ Konstanten/State → Helfer (`el`, `toast`, `norm`) → TMDB (Warteschlange, `ma
 - Nach Änderungen an `app.js`/`style.css` den `?v=` in `index.html` erhöhen. GitHub Pages cacht HTML bis ~10 Min.
 - Supabase-Mailversand: max. 2 Mails/Stunde → Passwort-Login als Ausweg.
 - Deployment kann bei GitHub-Störungen mit `startup_failure` scheitern → `gh api repos/toerdmann/moviedude/actions/runs` prüfen, ggf. leerer Commit.
-- Aus der Sandbox sind TMDB, Supabase und github.io nicht erreichbar; testen nur mit Mock (Playwright + emuliertes Supabase/TMDB).
+- Aus der Sandbox sind TMDB, Supabase und github.io nicht erreichbar; getestet wird mit `bash tests/run.sh`. Der Mock in `tests/e2e.cjs` bildet die Zugriffsregeln nur vereinfacht nach – Änderungen an `schema.sql` zusätzlich in `tests/rls.sql` prüfen.
+- `?mdtest` in der URL stellt `window.__mdTest` (matchByTitle, norm, discLabel) für Tests bereit.
+- Mock-TMDB im Test: gerade ID = englisches Original, ID%3 → 0 Netflix, 1 Prime (+ Werbung), 2 nirgends.
 - Letterboxd-Titelzuordnung ist heuristisch (`matchByTitle`); Fehlzuordnungen zeigen sich als „ungesehen“ obwohl gesehen.
