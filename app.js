@@ -522,7 +522,7 @@ function renderTabs() {
   if (isOwner()) {
     for (const l of state.lists) tab(l.id, l.name, countIn(l.id),
       l.id !== 'mine' && l.id !== OURS ? { ondblclick: () => removeList(l) } : {});
-    tab('all', 'Fundus');
+    tab('all', 'Alles');
     tab('discover', 'Entdecken');
     if (state.hidden.length) tab('hidden', 'Nie', state.hidden.length);
     nav.append(el('button', { class: 'tab add', type: 'button', onclick: () => $('#newListDlg').showModal() }, '+ Liste'));
@@ -753,7 +753,7 @@ async function tmdbSearch() {
     await Promise.all(ids.map(id => film(id)));
     state.extra = uniq([...state.extra, ...ids]);
     persist(); rebuild(); state.tab = 'all'; state.source = 'all'; render();
-    toast(ids.length ? `${ids.length} Treffer im „Fundus“. Per Listen-Chip übernehmen.` : 'Nichts gefunden.');
+    toast(ids.length ? `${ids.length} Treffer unter „Alles“. Per Listen-Chip übernehmen.` : 'Nichts gefunden.');
   } catch (e) { toast('Suche fehlgeschlagen: ' + e.message); }
 }
 
