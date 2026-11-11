@@ -107,13 +107,20 @@ async function matchByTitle(title, year, lang) {
   const tries = year
     ? [{ query: title, primary_release_year: year, language: lang }, { query: title, year, language: lang }, { query: title, language: lang }]
     : [{ query: title, language: lang }];
+  // Bewertet jeden Treffer: gleiches Jahr > ±1 Jahr, exakter Titel, bei Gleichstand der bekanntere Film.
+  const nt = norm(title);
+  const score = m => {
+    const y = parseInt((m.release_date || '').slice(0, 4), 10);
+    let sc = 0;
+    if (year) { if (y === year) sc += 4; else if (Math.abs(y - year) === 1) sc += 2; else return -1; }
+    if (norm(m.title) === nt || norm(m.original_title) === nt) sc += 3;
+    return sc + Math.min(2, Math.log10((m.vote_count || 0) + 1) / 2);
+  };
   for (const p of tries) {
     const r = await tmdb('/search/movie', p);
-    const res = r.results || [];
-    if (!res.length) continue;
-    if (!year) return res[0].id;
-    const hit = res.find(m => Math.abs(parseInt((m.release_date || '0').slice(0, 4), 10) - year) <= 1);
-    if (hit) return hit.id;
+    let best = null, bestScore = -1;
+    for (const m of r.results || []) { const sc = score(m); if (sc > bestScore) { best = m; bestScore = sc; } }
+    if (best && bestScore >= 0) return best.id;
   }
   return null;
 }
@@ -306,7 +313,7 @@ function setOffline(off, msg) {
 /* ---------- Quelldaten ---------- */
 let SRC = { shelf: [], watchlist: [], watched: [], ratings: [] };
 const keyShelf = s => s.imdb ? 'i:' + s.imdb : 's:' + norm(s.title) + '|' + s.year;
-const keyLb = s => 'l:' + s.lb;
+const keyLb = s => 'l2:' + s.lb;                  // l2: bessere Titelsuche (vorher l:)
 
 let lib = new Map();   // tmdbId -> { shelf, wl, lb, … }
 let seen = new Set();
@@ -405,7 +412,7 @@ async function sync({ force = false } = {}) {
     if (CLOUD && isOwner()) {
       if (JSON.stringify(shelfMap) !== JSON.stringify(house.shelf || {})) pushHouse('shelf', shelfMap);
       const m = Object.fromEntries(Object.entries(cache.match).filter(([, v]) => v));
-      if (Object.keys(m).length !== Object.keys(house.match || {}).length) pushHouse('match', m);
+      if (JSON.stringify(m) !== JSON.stringify(house.match || {})) pushHouse('match', m);
     }
   } catch (e) {
     toast(e.status === 401 ? 'TMDB lehnt den Schlüssel ab. Bitte in den Einstellungen prüfen.' : 'Abgleich unterbrochen: ' + e.message);
@@ -1203,6 +1210,7 @@ async function start(session) {
     if (isOwner()) {
       const local = load(STATE_KEY, null);
       if (house.match) cache.match = Object.assign({}, house.match, cache.match);
+      for (const k of Object.keys(cache.match)) if (k.startsWith('l:')) delete cache.match[k];
       if (!house.tmdb_key && local?.apiKey) { state.apiKey = local.apiKey; await pushHouse('tmdb_key', local.apiKey); }
       if (house.services == null && local?.services) { state.services = local.services; await pushHouse('services', local.services); }
       if (!marks.length && hasContent(local)) {
