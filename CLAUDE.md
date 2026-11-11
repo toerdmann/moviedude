@@ -23,7 +23,6 @@ Live: https://toerdmann.github.io/moviedude/ (GitHub Pages, Branch `main`, Root)
 ## Regeln
 - Commits immer als `toerdmann <340679489+toerdmann@users.noreply.github.com>`, nie mit Gmail-Adresse.
 - Nach Änderungen an `app.js`/`style.css` die `?v=`-Parameter in `index.html` hochzählen (Cache).
-- Nie „LEGO“ mit Bindestrich schreiben.
 - Größere Features erst als Konzept besprechen, dann bauen.
 - Verfügbarkeit: „Heute verfügbar“ = eigenes Regal oder aktiver Dienst; Prime zählt nicht bei englischem Original ohne O-Ton (noov).
 - Trailer: bei englischem Original englisch, sonst deutsch.
