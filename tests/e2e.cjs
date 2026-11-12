@@ -1,5 +1,5 @@
 // MovieDude – Ende-zu-Ende-Test
-// Echte App (index.html, app.js, data/*.json) + echtes supabase-js im Chromium.
+// Echte App (index.html, js/*.js, data/*.json) + echtes supabase-js im Chromium.
 // Supabase-REST/Auth und TMDB werden hier im Test nachgebaut (inkl. vereinfachter Zugriffsregeln),
 // weil die Sandbox weder Supabase noch TMDB erreicht. Realtime wird nicht emuliert; Abgleich zwischen
 // Geräten läuft im Test über das Wieder-in-den-Vordergrund-Holen (refresh).

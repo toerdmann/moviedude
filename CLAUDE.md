@@ -6,7 +6,7 @@ Private Filmauswahl-App von Tobias („Dude“) und seiner Frau Sarah. Sprache i
 Live: https://toerdmann.github.io/moviedude/ (GitHub Pages, Branch `main`, Root).
 
 ## Aufbau
-- Reine statische Seite: `index.html`, `style.css`, `app.js` (kein Build). `config.js` enthält Supabase-URL und publishable key (öffentlich ok).
+- Reine statische Seite: `index.html`, `style.css`, Logik in `js/` (kein Build, klassische Skripte mit gemeinsamem globalem Scope, Reihenfolge in `index.html`): `base` → `tmdb` → `db` → `library` → `list` → `dialogs` → `discover` → `start`. `config.js` enthält Supabase-URL und publishable key (öffentlich ok).
 - Filmdaten live von TMDB im Browser (Key liegt in Supabase `household.tmdb_key`, nie im Code). Verfügbarkeit Region DE (JustWatch über TMDB).
 - Supabase (Org „Nubsicorp“, Projekt `moviedude`): Login per Mail-Link oder Passwort. Schema in `supabase/schema.sql`
   (Mail-Adressen dort nur als Platzhalter – echte Adressen nie ins öffentliche Repo).
@@ -23,7 +23,7 @@ Live: https://toerdmann.github.io/moviedude/ (GitHub Pages, Branch `main`, Root)
 - Einzelne gekaufte Filme trägt Tobias selbst über „+ Film“ ein.
 
 ## Regeln
-- Vor jedem Push: `bash tests/run.sh` (Browser-Test + Datenbank-Regeln). Neue Features bekommen Checks in `tests/e2e.cjs`.
+- Vor jedem Push: `bash tests/run.sh` (Smoke-Test + Browser-Test + Datenbank-Regeln). Neue Features bekommen Checks in `tests/e2e.cjs`.
 - Commits immer als `toerdmann <340679489+toerdmann@users.noreply.github.com>`, nie mit Gmail-Adresse.
 - Cache-Version (`?v=` in `index.html`) setzt `tests/run.sh` automatisch über `scripts/bump.sh`, sobald App-Dateien geändert sind.
 - Größere Features erst als Konzept besprechen, dann bauen.
