@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Startet alle Tests. Aufruf aus dem Repo-Ordner:  bash tests/run.sh
+#   smoke – App über lokalen HTTP-Server laden: keine Konsolenfehler, Hauptansichten rendern
 #   e2e  – Browser-Test (Playwright, Supabase/TMDB nachgebaut)
 #   rls  – Zugriffsregeln der Datenbank gegen ein lokales Postgres (falls installiert)
 set -euo pipefail
@@ -17,6 +18,8 @@ fi
 node --check app.js
 # Geänderte App-Dateien? Dann Cache-Version in index.html hochsetzen.
 if ! git diff --quiet HEAD -- app.js style.css config.js 2>/dev/null; then bash scripts/bump.sh; fi
+echo "### Smoke-Test"
+node tests/smoke.js
 echo "### Browser-Test"
 node tests/e2e.cjs
 if ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1; then
