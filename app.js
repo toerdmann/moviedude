@@ -1,7 +1,6 @@
 /* MovieDude — Watchlist, Regal und Streaming-Verfügbarkeit.
    Login per Mail-Link oder Passwort, Daten in Supabase, gemeinsame Liste "Unsere" mit Sarah.
    Aufbau und Änderungsleitfaden: docs/ARCHITEKTUR.md */
-(() => {
 'use strict';
 
 const API = 'https://api.themoviedb.org/3';
@@ -1408,4 +1407,3 @@ async function boot() {
 // Nur für die automatischen Tests (tests/e2e.cjs öffnet die Seite mit ?mdtest)
 if (/[?&]mdtest\b/.test(location.search)) window.__mdTest = { matchByTitle, norm, discLabel };
 boot();
-})();
