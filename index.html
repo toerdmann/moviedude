@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=202611121922">
+<link rel="stylesheet" href="style.css?v=202611151504">
 </head>
 <body>
 <header class="top">
@@ -126,12 +126,13 @@
 
 <dialog id="trayDlg" class="dlg">
   <div class="dlg-head"><h2>Heute Abend</h2><button class="btn ghost" data-close type="button">Schließen</button></div>
+  <p class="hint">Die Sterne seht ihr beide – kein Verschicken nötig.</p>
   <ol id="trayList" class="tray-list"></ol>
-  <label class="lbl" for="trayText">Nachricht zum Verschicken</label>
+  <label class="lbl" for="trayText">Nachricht zum Verschicken (optional)</label>
   <textarea id="trayText" rows="8" readonly></textarea>
   <div class="dlg-actions">
     <button class="btn" id="trayCopy" type="button">Text kopieren</button>
-    <button class="btn ghost" id="trayClear" type="button">Auswahl leeren</button>
+    <button class="btn ghost" id="trayClear" type="button">Für beide leeren</button>
   </div>
 </dialog>
 
@@ -221,15 +222,15 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="config.js?v=202611121922"></script>
+<script src="config.js?v=202611151504"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
-<script src="js/base.js?v=202611121922"></script>
-<script src="js/tmdb.js?v=202611121922"></script>
-<script src="js/db.js?v=202611121922"></script>
-<script src="js/library.js?v=202611121922"></script>
-<script src="js/list.js?v=202611121922"></script>
-<script src="js/dialogs.js?v=202611121922"></script>
-<script src="js/discover.js?v=202611121922"></script>
-<script src="js/start.js?v=202611121922"></script>
+<script src="js/base.js?v=202611151504"></script>
+<script src="js/tmdb.js?v=202611151504"></script>
+<script src="js/db.js?v=202611151504"></script>
+<script src="js/library.js?v=202611151504"></script>
+<script src="js/list.js?v=202611151504"></script>
+<script src="js/dialogs.js?v=202611151504"></script>
+<script src="js/discover.js?v=202611151504"></script>
+<script src="js/start.js?v=202611151504"></script>
 </body>
 </html>

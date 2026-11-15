@@ -24,7 +24,7 @@ const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSO
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
 
 const UI_FIELDS = ['tab', 'source', 'runtime', 'sort', 'genres', 'feed'];
-const SYNC_PREF_FIELDS = ['lists', 'tray', 'lastSeen', 'ratedDone'];
+const SYNC_PREF_FIELDS = ['lists', 'lastSeen', 'ratedDone'];   // "tray" liegt seit dem gemeinsamen Heute Abend in shared_items
 const freshState = () => ({
   apiKey: '',
   services: null,                       // [provider_id]
