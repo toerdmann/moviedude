@@ -57,12 +57,14 @@ async function start(session) {
     Object.assign(state, freshState(), load(UI_KEY, {}));
     const pd = prefsRes.data?.data || {};
     for (const k of SYNC_PREF_FIELDS) if (pd[k] !== undefined) state[k] = pd[k];
+    state.tray = pd.tray || [];                  // altes persönliches Heute Abend -> migrateTray()
     if (!state.lists.some(l => l.id === OURS)) state.lists.splice(1, 0, { id: OURS, name: 'Unsere' });
     marksToState(marks);
     synced = new Map(marks.map(r => [r.tmdb_id + '|' + r.kind, JSON.stringify(r.val)]));   // inkl. abgelaufener Einträge -> werden beim nächsten Speichern gelöscht
     syncedPrefs = JSON.stringify(prefsData());
     shared = new Map(sharedRows.filter(r => r.list_id === OURS).map(r => [r.tmdb_id, pickShared(r)]));
     noov = new Map(sharedRows.filter(r => r.list_id === NOOV).map(r => [r.tmdb_id, pickShared(r)]));
+    tonight = new Map(sharedRows.filter(r => r.list_id === TONIGHT).map(r => [r.tmdb_id, pickShared(r)]));
     state.apiKey = house.tmdb_key || '';
     state.services = house.services ?? null;
 
@@ -80,6 +82,7 @@ async function start(session) {
         toast(`Deine Daten aus diesem Browser sind jetzt in der Datenbank${n ? `, inklusive ${n} Filmen in Unsere` : ''}.`);
       }
     }
+    migrateTray();
     subscribe();
     pushMarks();                                 // räumt Datenleichen (z. B. abgelaufenes "Lass erstmal") auf
     showView('app'); rebuild(); render();
@@ -126,7 +129,7 @@ async function refresh() {
     if (pd && JSON.stringify(prefsData()) === syncedPrefs) { for (const k of SYNC_PREF_FIELDS) if (pd[k] !== undefined) state[k] = pd[k]; syncedPrefs = JSON.stringify(prefsData()); }
     state.apiKey = house.tmdb_key || state.apiKey;
     state.services = house.services ?? state.services;
-    rebuild(); render();
+    rebuild(); render(); loadMissing();
   } catch { /* nächstes Mal */ }
 }
 async function bootCloud() {
@@ -267,7 +270,7 @@ function wire() {
     try { await navigator.clipboard.writeText($('#trayText').value); toast('Kopiert. Ab damit per WhatsApp.'); }
     catch { $('#trayText').select(); toast('Text markiert, jetzt kopieren.'); }
   });
-  $('#trayClear').addEventListener('click', () => { state.tray = []; persist(); render(); $('#trayDlg').close(); });
+  $('#trayClear').addEventListener('click', () => { setTonight(tonightIds(), false); render(); $('#trayDlg').close(); });
   $('#newListForm').addEventListener('submit', e => {
     e.preventDefault();
     const name = $('#newListName').value.trim(); if (!name) return;

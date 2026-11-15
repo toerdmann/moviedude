@@ -20,7 +20,7 @@ Kurzfassung für alle, die (auch in neuen Chats) an der App arbeiten. Ergänzt `
 |---|---|
 | `base.js` | Konstanten, Config, `load`/`save`, `state`/`freshState`, `cache`, `me`/`people`/`house`/`sb`, Helfer (`$`, `el`, `toast`, `norm`, `uniq`, `ts` …) |
 | `tmdb.js` | Warteschlange (`tmdb`), `checkKey`, `matchByImdb`, `matchByTitle`, `details`, `isFresh`, `film`, `loadProviders` |
-| `db.js` | Prime ohne O-Ton (`noov`, `setNoov`), „Unsere“ (`shared`, `setOurs`, `applyRemoteShared`), Markierungen (`marksMap`, `setMark`, `pushMarks`, `applyRemoteMark`), `pushPrefs`, `pushHouse`, `persist`, `setOffline`, Übernahme aus Etappe 1/Backup (`hasContent`, `mergeState`) |
+| `db.js` | Prime ohne O-Ton (`noov`, `setNoov`), „Unsere“ (`shared`, `setOurs`, `applyRemoteShared`), Heute Abend (`tonight`, `setTonight`, `tonightIds`, `migrateTray`), Markierungen (`marksMap`, `setMark`, `pushMarks`, `applyRemoteMark`), `pushPrefs`, `pushHouse`, `persist`, `setOffline`, Übernahme aus Etappe 1/Backup (`hasContent`, `mergeState`) |
 | `library.js` | Quelldaten `SRC`, `lib`/`seen`/…, `rebuild()`, `DISC_FORMATS`/`discLabel`, `privateMembers`/`membersOf`, `sync()`, `progress` |
 | `list.js` | Listenansicht: `streamable`, `allowedTabs`, `visibleIds`, Nachtragen (`toRate`, `renderRate`), `renderTabs`, `renderGenres`, `card`, `render`, Aktionen (`toggleList`, `markSeen`, `hide` …), Heute Abend, `tmdbSearch` |
 | `dialogs.js` | „+ Film“, Detailansicht (`openFilm`), Vorschlagen (`resolveInput`, `whereText`, `suggest`), Hinweise (`renderNotice`), Einstellungen (`renderServices`, `stats`, `openSettings`) |
@@ -39,9 +39,10 @@ Innerhalb der Dateien trennen weiterhin `/* ---------- Name ---------- */` die A
 2. **Zuordnung**: Schlüssel in `cache.match`: `i:<imdb>` (MyMovies), `l2:<letterboxd-uri>` (Letterboxd; Präfix bei Algorithmus-Änderung hochzählen → erzwingt Neuabgleich). `null` = nicht gefunden (wird ohne „Alles neu abgleichen“ nicht erneut gesucht).
 3. **Filmdaten**: `cache.films[id]` (kompakt: t, o, y, r, v, g, p, ov, imdb, tr, fl, ol, ts). `isFresh()` erzwingt Neuladen alter Einträge; neue Pflichtfelder dort ergänzen. `sync()` lädt nur `lib`-Filme, `film(id)` alles andere bei Bedarf.
 4. **Persönliche Markierungen** (`marks`): Der In-Memory-State (`hidden`, `seenLocal`, `unseenLocal`, `extra`, `snooze`, `members`) wird per `marksMap()` in Zeilen übersetzt; `pushMarks()` schreibt nur den Diff gegen `synced`. Fremde Änderungen (Realtime/`refresh`) werden nur übernommen, wenn lokal nichts Ungespeichertes ansteht.
-5. **Gemeinsames** (`shared_items`): `setOurs`/`setNoov` schreiben sofort, optimistisch, mit Rücknahme bei Fehler. `changed_by/changed_at` setzt ein DB-Trigger.
+5. **Gemeinsames** (`shared_items`, `list_id` = `ours`/`noov`/`tonight`): `setOurs`/`setNoov`/`setTonight` schreiben sofort, optimistisch, mit Rücknahme bei Fehler. `changed_by/changed_at` setzt ein DB-Trigger.
 6. **Haushalt** (`household`, nur Tobias schreibt): `tmdb_key`, `services`, `shelf` (für Sarah), `match`, `shelf_extra`. Letzter Schreiber gewinnt.
-7. **Prefs** (`prefs`): `lists`, `tray`, `lastSeen`, `ratedDone` als ein JSON-Blob – letzter Schreiber gewinnt.
+7. **Prefs** (`prefs`): `lists`, `lastSeen`, `ratedDone` als ein JSON-Blob – letzter Schreiber gewinnt. Ein altes `tray` darin übernimmt `migrateTray()` einmalig ins gemeinsame Heute Abend.
+10. **Nachladen**: Kommt per Realtime/`refresh` ein Film neu in `lib` (z. B. von der anderen Person in Unsere gelegt), lädt `loadMissing()` (`library.js`) dessen TMDB-Daten nach.
 8. **Pro Gerät** (localStorage): `md.ui.v1` (Tab, Filter, Sortierung), `md.cache.v1` (TMDB-Cache). `md.state.v1` = alter Etappe-1-Zustand, wird nur noch gelesen (einmalige Übernahme, Knopf „Daten aus diesem Browser übernehmen“).
 9. **Aufräumen**: Beim Start gilt der Datenbank-Stand als `synced`; was lokal nicht mehr existiert (z. B. abgelaufenes „Lass erstmal“), löscht der erste `pushMarks()`.
 

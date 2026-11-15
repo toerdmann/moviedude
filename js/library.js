@@ -92,7 +92,7 @@ async function sync({ force = false } = {}) {
     const want = [];
     for (const id of lib.keys()) {
       const f = cache.films[id];
-      const hot = !isOwner() || isCandidate(id) || (state.members[id] || []).length || inOurs(id) || state.tray.includes(id);
+      const hot = !isOwner() || isCandidate(id) || (state.members[id] || []).length || inOurs(id) || inTonight(id);
       if (force || !f || f.ol === undefined || now - f.ts > (hot ? FRESH_MS : STALE_MS)) want.push(id);
     }
     if (want.length) {
@@ -111,6 +111,16 @@ async function sync({ force = false } = {}) {
   } finally {
     syncing = false; progress(); render(); stats();
   }
+}
+/* Filme, die per Abgleich mit der anderen Person neu in lib landen (Unsere, Heute Abend), ohne vollen sync() nachladen */
+const triedMissing = new Set();
+async function loadMissing() {
+  if (!state.apiKey || syncing) return;
+  const ids = [...lib.keys()].filter(id => !cache.films[id] && !triedMissing.has(id));
+  if (!ids.length) return;
+  ids.forEach(id => triedMissing.add(id));
+  await Promise.all(ids.map(id => details(id).then(d => { cache.films[id] = d; }).catch(() => {})));
+  persistCache(); render();
 }
 function progress(label, n, total) {
   const box = $('#sync');

@@ -277,9 +277,10 @@ const tabText = async (page, name) => { const t = page.locator(`#tabs .tab:has-t
     check(tm.filter(m => m.kind === 'hidden').length === 2 && tm.some(m => m.kind === 'seen' && m.tmdb_id === 30694) && tm.some(m => m.kind === 'snooze' && m.tmdb_id === 777), 'Nie, Gesehen, Lass erstmal übernommen');
     const l333 = tm.find(m => m.kind === 'lists' && m.tmdb_id === 333371);
     check(l333 && JSON.stringify(l333.val) === '["mine"]', 'Private Listen ohne "ours" gespeichert');
-    check(JSON.stringify(db.shared_items.filter(r => r.in_list).map(r => r.tmdb_id).sort()) === '[118715,333371]', 'Unsere in die gemeinsame Liste verschoben');
+    check(JSON.stringify(db.shared_items.filter(r => r.list_id === 'ours' && r.in_list).map(r => r.tmdb_id).sort()) === '[118715,333371]', 'Unsere in die gemeinsame Liste verschoben');
     const pr = db.prefs.find(p => p.user_id === T.sub);
-    check(pr && pr.data.lists.some(l => l.id === 'lhal') && pr.data.tray.includes(118715), 'Eigene Listen und Heute Abend synchronisiert');
+    check(pr && pr.data.lists.some(l => l.id === 'lhal') && pr.data.tray === undefined, 'Eigene Listen synchronisiert, altes "tray" aus den Prefs entfernt');
+    check(db.shared_items.some(r => r.list_id === 'tonight' && r.tmdb_id === 118715 && r.in_list && r.added_by === T.sub), 'Altes Heute Abend ins gemeinsame Heute Abend übernommen');
     const tabs = await t1.page.locator('#tabs .tab').allTextContents();
     check(['Meine', 'Unsere', 'Halloween', 'Alles', 'Entdecken'].every(n => tabs.some(t => t.startsWith(n))), 'Tabs: ' + tabs.join(' | '));
     check(await t1.page.locator('#openAdd').isVisible(), '"+ Film" sichtbar für Tobias');
@@ -314,7 +315,9 @@ const tabText = async (page, name) => { const t = page.locator(`#tabs .tab:has-t
     check(tabs.length === 2 && tabs[0].startsWith('Unsere') && tabs[1].startsWith('Entdecken'), 'Nur Unsere + Entdecken: ' + tabs.join(' | '));
     check(await s.page.locator('#grid .card').count() === 2, 'Sieht die 2 Filme in Unsere');
     check(await s.page.locator('.filters').isHidden() && await s.page.locator('#suggest').isVisible(), 'Filter eingeklappt, Vorschlagsfeld oben');
-    check(await s.page.locator('#tray').isHidden() && await s.page.locator('#openAdd').isHidden(), 'Tobias\' Heute Abend und "+ Film" sind für sie unsichtbar');
+    check(await s.page.locator('#tray').isVisible() && (await s.page.textContent('#trayCount')) === '1', 'Sie sieht Tobias\' Heute Abend (1 Film)');
+    check(/Heute-Abend-Tipp von Tobias/.test(await s.page.textContent('#grid .card[data-id="118715"]')) && await s.page.locator('#grid .card[data-id="118715"] .tonight.on').count() === 1, 'Karte zeigt Stern + "Tipp von Tobias"');
+    check(await s.page.locator('#openAdd').isHidden(), '"+ Film" ist für sie unsichtbar');
     await s.page.screenshot({ path: path.join(SHOTS, 'sarah-unsere.png') });
     await s.page.click('#openSettings');
     check(await s.page.locator('#keyBlock').isHidden() && await s.page.locator('#svcBlock').isHidden() && await s.page.locator('#dataBlock').isHidden(), 'Keine Schlüssel-, Dienste- und Datenverwaltung');
@@ -325,8 +328,10 @@ const tabText = async (page, name) => { const t = page.locator(`#tabs .tab:has-t
     await s.page.waitForSelector('#suggestList li', { timeout: 10000 });
     check(/Film 99999/.test(await s.page.textContent('#suggestList')), 'IMDb-Link aufgelöst');
     await s.page.click('#suggestList li button'); await sleep(500);
-    const r99 = db.shared_items.find(r => r.tmdb_id === 99999);
+    const r99 = db.shared_items.find(r => r.list_id === 'ours' && r.tmdb_id === 99999);
     check(r99 && r99.in_list && r99.added_by === S.sub, 'Vorschlag gespeichert, von Sarah');
+    await s.page.locator('#grid .card[data-id="99999"] .tonight').click(); await sleep(500);
+    check(db.shared_items.some(r => r.list_id === 'tonight' && r.tmdb_id === 99999 && r.in_list && r.added_by === S.sub) && (await s.page.textContent('#trayCount')) === '2', 'Sarah setzt selbst einen Stern');
     await s.page.fill('#suggestInput', 'https://letterboxd.com/film/the-big-lebowski/');
     await s.page.click('#suggestForm button');
     await s.page.waitForFunction(() => !/Suche/.test(document.querySelector('#suggestStatus').textContent), null, { timeout: 10000 });
@@ -337,7 +342,8 @@ const tabText = async (page, name) => { const t = page.locator(`#tabs .tab:has-t
 
     const n = await s.page.locator('#grid .card').count();
     await s.page.locator('#grid .card[data-id="118715"] button:has-text("Raus aus Unsere")').click(); await sleep(500);
-    check(db.shared_items.find(r => r.tmdb_id === 118715).in_list === false && await s.page.locator('#grid .card').count() === n - 1, 'Rausnehmen wirkt sofort und wird gespeichert');
+    check(db.shared_items.find(r => r.list_id === 'ours' && r.tmdb_id === 118715).in_list === false && await s.page.locator('#grid .card').count() === n - 1, 'Rausnehmen wirkt sofort und wird gespeichert');
+    check(db.shared_items.find(r => r.list_id === 'tonight' && r.tmdb_id === 118715).in_list === false && (await s.page.textContent('#trayCount')) === '1', 'Raus aus Unsere nimmt auch den Stern weg');
 
     await s.page.click('#tabs .tab:has-text("Entdecken")');
     await s.page.waitForSelector('.swipe:not(.back)', { timeout: 10000 });
@@ -362,12 +368,25 @@ const tabText = async (page, name) => { const t = page.locator(`#tabs .tab:has-t
     await t1.page.click('#noticeShow');
     await t1.page.waitForSelector('#noticeList li button', { timeout: 10000 });
     await t1.page.click('#noticeList li button'); await sleep(600);
-    check(db.shared_items.find(r => r.tmdb_id === 118715).in_list === true, 'Zurückholen aus dem Hinweis');
+    check(db.shared_items.find(r => r.list_id === 'ours' && r.tmdb_id === 118715).in_list === true, 'Zurückholen aus dem Hinweis');
     await t1.page.click('#noticeDlg [data-close]'); await sleep(600);
     check(await t1.page.locator('#notice').isHidden(), 'Hinweis verschwindet nach dem Ansehen');
     await t1.page.click('#tabs .tab:has-text("Unsere")');
     await t1.page.click('#source button[data-v="all"]');
     check(/Vorschlag von Sarah/.test(await t1.page.textContent('#grid')), 'Karte zeigt "Vorschlag von Sarah"');
+    check(/Heute-Abend-Tipp von Sarah/.test(await t1.page.textContent('#grid .card[data-id="99999"]')) && (await t1.page.textContent('#trayCount')) === '1', 'Tobias sieht Sarahs Stern');
+
+    await t1.page.click('#tabs .tab:has-text("Meine")');
+    const solo = await t1.page.evaluate(() => [...document.querySelectorAll('#grid .card')].map(c => +c.dataset.id).find(id => ![...document.querySelectorAll(`#grid .card[data-id="${id}"] .lchip.on`)].some(b => b.textContent === 'Unsere')));
+    await t1.page.locator(`#grid .card[data-id="${solo}"] .tonight`).click(); await sleep(600);
+    check(db.shared_items.some(r => r.list_id === 'tonight' && r.tmdb_id === solo && r.in_list) && db.shared_items.some(r => r.list_id === 'ours' && r.tmdb_id === solo && r.in_list), 'Stern auf Film aus Meine legt ihn auch in Unsere');
+    await foreground(s.page);
+    await s.page.click('#tabs .tab:has-text("Unsere")'); await sleep(1500);
+    check(await s.page.locator(`#grid .card[data-id="${solo}"] .tonight.on`).count() === 1 && (await s.page.textContent('#trayCount')) === '2', 'Sarah sieht den neuen Stern ohne WhatsApp');
+    await s.page.click('#trayOpen');
+    check(/von Tobias/.test(await s.page.textContent('#trayList')), 'Heute-Abend-Dialog zeigt, von wem der Tipp ist');
+    await s.page.click('#trayDlg [data-close]');
+    await t1.page.click('#tabs .tab:has-text("Unsere")');
   }
 
   console.log('\n== Gesehen auf dem iMac, Handy zieht nach ==');

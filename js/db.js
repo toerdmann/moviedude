@@ -42,9 +42,35 @@ async function setOurs(id, on) {
     if (n > 0) pendingShared.set(id, n); else pendingShared.delete(id);
   }
 }
+/* ---------- Gemeinsames "Heute Abend" (beide sehen die Sterne; Stern legt den Film auch in "Unsere") ---------- */
+const TONIGHT = 'tonight';
+let tonight = new Map();                // tmdbId -> { in_list, added_by, changed_by, changed_at }
+const inTonight = id => !!tonight.get(id)?.in_list;
+const tonightIds = () => [...tonight].filter(([, r]) => r.in_list).sort((a, b) => ts(a[1].changed_at) - ts(b[1].changed_at)).map(([id]) => id);
+async function setTonight(ids, on) {
+  ids = [].concat(ids).filter(id => inTonight(id) !== on);
+  if (!ids.length) return;
+  const prev = new Map(ids.map(id => [id, tonight.get(id)]));
+  const now = new Date().toISOString();
+  const rows = ids.map(id => ({ list_id: TONIGHT, tmdb_id: id, in_list: on, added_by: on ? me.id : (prev.get(id)?.added_by ?? null) }));
+  for (const r of rows) tonight.set(r.tmdb_id, { in_list: on, added_by: r.added_by, changed_by: me.id, changed_at: now });
+  renderTray();
+  const { data, error } = await sb.from('shared_items').upsert(rows, { onConflict: 'list_id,tmdb_id' }).select();
+  if (error) {
+    for (const [id, r] of prev) if (r) tonight.set(id, r); else tonight.delete(id);
+    toast('„Heute Abend“ konnte nicht gespeichert werden: ' + error.message); render(); return;
+  }
+  for (const r of data || []) if (r.tmdb_id != null && r.changed_at) tonight.set(r.tmdb_id, pickShared(r));
+}
+
 const pickShared = r => ({ in_list: r.in_list, added_by: r.added_by, changed_by: r.changed_by, changed_at: r.changed_at });
 function applyRemoteShared(r) {
   if (r && r.list_id === NOOV) { noov.set(r.tmdb_id, pickShared(r)); return true; }
+  if (r && r.list_id === TONIGHT) {
+    const cur = tonight.get(r.tmdb_id);
+    if (cur && cur.changed_at && ts(r.changed_at) < ts(cur.changed_at)) return false;
+    tonight.set(r.tmdb_id, pickShared(r)); return true;
+  }
   if (!r || r.list_id !== OURS) return false;
   const id = r.tmdb_id;
   if (pendingShared.has(id)) return false;
@@ -120,7 +146,7 @@ function applyRemoteMark(row, deleted) {
   return true;
 }
 
-/* Einstellungen, die zwischen Geräten geteilt werden (eigene Listen, Heute Abend, gelesen bis) */
+/* Einstellungen, die zwischen Geräten geteilt werden (eigene Listen, gelesen bis) */
 let syncedPrefs = '';
 const prefsData = () => Object.fromEntries(SYNC_PREF_FIELDS.map(k => [k, state[k]]));
 async function pushPrefs() {
@@ -158,6 +184,16 @@ function legacyOursIds(s) {
   for (const [id, r] of Object.entries(s.sharedLocal || {})) if (r?.in_list) ids.push(+id);
   return uniq(ids);
 }
+/* Altes persönliches "Heute Abend" (prefs.tray / Backup) einmalig in die gemeinsame Liste übernehmen */
+function migrateTray() {
+  const ids = uniq((state.tray || []).map(Number)).filter(Boolean);
+  state.tray = [];
+  if (!ids.length) return;
+  for (const id of ids) if (!inOurs(id)) setOurs(id, true);
+  setTonight(ids, true);
+  syncedPrefs = '';                          // erzwingt Speichern der Prefs ohne "tray"
+  persist();
+}
 function mergeState(src, { takeUi = false } = {}) {
   const num = a => (a || []).map(Number);
   for (const [kind, key] of Object.entries(ARR_KIND)) state[key] = uniq([...state[key], ...num(src[key])]);
@@ -169,6 +205,7 @@ function mergeState(src, { takeUi = false } = {}) {
   const ours = legacyOursIds(src);
   persist();
   for (const id of ours) if (!inOurs(id)) setOurs(id, true);
+  migrateTray();
   rebuild(); render();
   return ours.length;
 }

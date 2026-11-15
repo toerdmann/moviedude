@@ -13,8 +13,8 @@ Live: https://toerdmann.github.io/moviedude/ (GitHub Pages, Branch `main`, Root)
   - `members`: Gästeliste, Rollen `owner` (Tobias) und `partner` (Sarah).
   - `household`: tmdb_key, services, shelf (Regal-Zuordnung für Sarah), match (TMDB-Zuordnungen), shelf_extra (per „+ Film“ eingetragene Discs).
   - `marks`: persönliche Markierungen pro Film (hidden, seen, unseen, extra, snooze, lists).
-  - `prefs`: lists, tray, lastSeen, ratedDone.
-  - `shared_items`: `list_id='ours'` = gemeinsame Liste „Unsere“; `list_id='noov'` = Prime ohne englischen O-Ton (mit Datum).
+  - `prefs`: lists, lastSeen, ratedDone (altes `tray` wird beim Start einmalig nach `shared_items`/`tonight` übernommen).
+  - `shared_items`: `list_id='ours'` = gemeinsame Liste „Unsere“; `list_id='noov'` = Prime ohne englischen O-Ton (mit Datum); `list_id='tonight'` = gemeinsames „Heute Abend“ (Sterne sehen beide, Stern legt den Film auch in „Unsere“).
 - Ohne Supabase-Config zeigt die App nur einen Hinweis (der alte Browser-only-Modus aus Etappe 1 ist entfernt).
 
 ## Daten aktualisieren

@@ -167,7 +167,9 @@ function card(id) {
   const isSeen = seen.has(id);
   const isHidden = state.hidden.includes(id);
   const st = streamable(f);
-  const inTray = state.tray.includes(id);
+  const inTray = inTonight(id);
+  const tn = tonight.get(id);
+  const tipBy = inTray && tn?.added_by && tn.added_by !== me.id ? otherName(tn.added_by) : '';
   const sh = shared.get(id);
   const stickers = [];
   if (e.shelf) stickers.push(el('span', { class: 'sticker' }, e.shelf));
@@ -179,6 +181,7 @@ function card(id) {
   if (e.shelf && isOwner()) src.push(e.sarah && !e.mineShelf ? 'Regal (Sarahs)' : 'Regal');
   if (sh?.in_list && sh.added_by && sh.added_by !== me.id) src.push('Vorschlag von ' + otherName(sh.added_by));
   if (isOwner() && !src.length && state.extra.includes(id)) src.push('per Suche hinzugefügt');
+  if (tipBy) src.push('★ Heute-Abend-Tipp von ' + tipBy);
 
   let actions;
   if (isOwner()) {
@@ -209,7 +212,7 @@ function card(id) {
       f.p ? el('img', { src: IMG + 'w342' + f.p, alt: '', loading: 'lazy' }) : el('div', { class: 'noimg' }, f.t),
       el('div', { class: 'stickers' }, stickers),
       el('div', { class: 'provs' }, st.map(p => el('img', { src: IMG + 'w92' + p[2], alt: p[1], title: p[1] }))),
-      el('button', { class: 'tonight' + (inTray ? ' on' : ''), type: 'button', title: inTray ? 'Aus Heute Abend entfernen' : 'Für heute Abend vormerken', 'aria-pressed': String(inTray), onclick: () => toggleTray(id) }, inTray ? '★' : '☆')
+      el('button', { class: 'tonight' + (inTray ? ' on' : ''), type: 'button', title: inTray ? (tipBy ? 'Tipp von ' + tipBy + ' – ' : '') + 'Aus Heute Abend entfernen' : 'Für heute Abend vormerken (sehen alle)', 'aria-pressed': String(inTray), onclick: () => toggleTray(id) }, inTray ? '★' : '☆')
     ),
     el('div', { class: 'body' },
       el('h3', { class: 'title' }, f.t),
@@ -270,7 +273,7 @@ function render() {
   renderTray();
 }
 let renderT = null;
-const renderSoon = () => { clearTimeout(renderT); renderT = setTimeout(() => { rebuild(); render(); }, 120); };
+const renderSoon = () => { clearTimeout(renderT); renderT = setTimeout(() => { rebuild(); render(); loadMissing(); }, 120); };
 
 /* ---------- Aktionen ---------- */
 function toggleList(id, lid) {
@@ -281,11 +284,12 @@ function toggleList(id, lid) {
 }
 function addToOurs(id) { setOurs(id, true); rebuild(); render(); }
 function removeFromOurs(id) {
-  setOurs(id, false); rebuild(); render();
+  const wasTonight = inTonight(id);
+  setOurs(id, false); setTonight(id, false); rebuild(); render();
   const f = cache.films[id];
-  toast(`„${f ? f.t : 'Film'}“ ist raus aus Unsere.`, { label: 'Rückgängig', run: () => addToOurs(id) });
+  toast(`„${f ? f.t : 'Film'}“ ist raus aus Unsere.`, { label: 'Rückgängig', run: () => { addToOurs(id); if (wasTonight) setTonight(id, true); } });
 }
-function hide(id) { state.hidden = uniq([...state.hidden, id]); state.tray = state.tray.filter(x => x !== id); persist(); render(); toast('Ausgeblendet. Zu finden im Tab „Nie“.'); }
+function hide(id) { state.hidden = uniq([...state.hidden, id]); setTonight(id, false); persist(); render(); toast('Ausgeblendet. Zu finden im Tab „Nie“.'); }
 function unhide(id) { state.hidden = state.hidden.filter(x => x !== id); persist(); render(); }
 function markSeen(id) {
   const prev = state.members[id];
@@ -293,7 +297,7 @@ function markSeen(id) {
   state.seenLocal = uniq([...state.seenLocal, id]);
   state.unseenLocal = state.unseenLocal.filter(x => x !== id);
   state.members[id] = [];                      // raus aus allen Listen
-  state.tray = state.tray.filter(x => x !== id);
+  setTonight(id, false);
   if (wasOurs) setOurs(id, false);
   persist(); rebuild(); render();
   window.open(lbLink(id), '_blank', 'noopener');
@@ -307,9 +311,10 @@ function unmarkSeen(id, prevMembers) {
   persist(); rebuild(); render();
   toast('Wieder in der Liste.');
 }
-function toggleTray(id) {
-  state.tray = state.tray.includes(id) ? state.tray.filter(x => x !== id) : [...state.tray, id];
-  persist(); render();
+function toggleTray(id) {                      // Stern = gemeinsames Heute Abend, legt den Film auch in Unsere
+  const on = !inTonight(id);
+  if (on && !inOurs(id)) setOurs(id, true);
+  setTonight(id, on); rebuild(); render();
 }
 function removeList(l) {
   const n = Object.values(state.members).filter(m => m.includes(l.id)).length;
@@ -321,23 +326,23 @@ function removeList(l) {
 }
 
 function renderTray() {
-  const n = state.tray.filter(id => cache.films[id]).length;
+  const n = tonightIds().filter(id => cache.films[id]).length;
   $('#tray').hidden = n === 0 || !appShown; $('#trayCount').textContent = n;
 }
 function trayText() {
-  const lines = state.tray.filter(id => cache.films[id]).map((id, i) => {
+  const lines = tonightIds().filter(id => cache.films[id]).map((id, i) => {
     const f = cache.films[id], e = lib.get(id) || {};
     const where = [e.shelf ? 'Regal' : null, ...streamable(f).map(p => p[1])].filter(Boolean).join(', ');
     return `${i + 1}. ${f.t} (${f.y}${f.r ? ', ' + f.r + ' min' : ''})${where ? ' – ' + where : ''}\n${f.imdb ? 'https://www.imdb.com/title/' + f.imdb + '/' : ''}`;
   });
-  return 'Filmabend? Meine Vorschläge:\n\n' + lines.join('\n\n');
+  return 'Filmabend? Die Kandidaten:\n\n' + lines.join('\n\n');
 }
 function openTray() {
-  const ol = $('#trayList'); ol.replaceChildren(...state.tray.filter(id => cache.films[id]).map(id =>
-    el('li', {}, el('span', {}, cache.films[id].t + ' (' + cache.films[id].y + ')'), el('button', { type: 'button', onclick: () => { toggleTray(id); openTray(); } }, 'Entfernen'))));
+  const ol = $('#trayList'); ol.replaceChildren(...tonightIds().filter(id => cache.films[id]).map(id =>
+    el('li', {}, el('span', {}, cache.films[id].t + ' (' + cache.films[id].y + ')' + (tonight.get(id).added_by && tonight.get(id).added_by !== me.id ? ' – von ' + otherName(tonight.get(id).added_by) : '')), el('button', { type: 'button', onclick: () => { toggleTray(id); openTray(); } }, 'Entfernen'))));
   $('#trayText').value = trayText();
   if (!$('#trayDlg').open) $('#trayDlg').showModal();
-  if (!state.tray.length) $('#trayDlg').close();
+  if (!tonightIds().length) $('#trayDlg').close();
 }
 
 async function tmdbSearch() {
